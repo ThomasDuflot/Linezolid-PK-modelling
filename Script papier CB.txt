@@ -3,8 +3,11 @@ library(dplyr)
 library(ggplot2)
 library(ggpubr)
 library(ggsci)
+library(flextable)
+library(officer)
+library(tidyr)
 
-
+setwd("D:/MOBILITE/Charles B/VF/")
 
 my_theme <- theme_minimal(base_size = 16) +
   theme(
@@ -104,6 +107,22 @@ MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
 
 Luque_PTA_results <- list()  # Store PTA results with Luque_ prefix
 
+# Function to calculate % of patients with fT > MIC for at least 85% of the time
+calc_pta_for_MIC <- function(data, MIC) {
+  # Group by ID and check if >= 85% of the time is above the MIC
+  Luque_pta_DVf <- data %>%
+    group_by(ID) %>%
+    summarize(fT_above_MIC = mean(DVf >= MIC)) %>%
+    summarize(Luque_PTA_DVf = mean(fT_above_MIC >= 0.85) * 100)  # % of patients with fT > MIC for >= 85% of the time
+  
+  Luque_pta_DVCSF <- data %>%
+    group_by(ID) %>%
+    summarize(fT_above_MIC = mean(DVCSF >= MIC)) %>%
+    summarize(Luque_PTA_DVCSF = mean(fT_above_MIC >= 0.85) * 100)  # % of patients with fT > MIC for >= 85% of the time
+  
+  return(c(Luque_PTA_DVf = Luque_pta_DVf$Luque_PTA_DVf, Luque_PTA_DVCSF = Luque_pta_DVCSF$Luque_PTA_DVCSF))
+}
+
 for (Luque_event_name in names(Luque_events)) {
   Luque_ev_current <- Luque_events[[Luque_event_name]]
   
@@ -116,22 +135,6 @@ for (Luque_event_name in names(Luque_events)) {
   Luque_out_72_96 <- Luque_out %>%
     as.data.frame() %>%
     filter(time >= 72 & time <= 96)
-  
-  # Function to calculate % of patients with fT > MIC = 100%
-  calc_pta_for_MIC <- function(data, MIC) {
-    # Group by ID and check if 100% of the time is above the MIC
-    Luque_pta_DVf <- data %>%
-      group_by(ID) %>%
-      summarize(fT_above_MIC = mean(DVf >= MIC)) %>%
-      summarize(Luque_PTA_DVf = mean(fT_above_MIC == 1) * 100)  # % of patients with fT > MIC = 100%
-    
-    Luque_pta_DVCSF <- data %>%
-      group_by(ID) %>%
-      summarize(fT_above_MIC = mean(DVCSF >= MIC)) %>%
-      summarize(Luque_PTA_DVCSF = mean(fT_above_MIC == 1) * 100)  # % of patients with fT > MIC = 100%
-    
-    return(c(Luque_PTA_DVf = Luque_pta_DVf$Luque_PTA_DVf, Luque_PTA_DVCSF = Luque_pta_DVCSF$Luque_PTA_DVCSF))
-  }
   
   # Calculate PTA for each MIC value
   Luque_PTA_fractions <- sapply(MIC_values, function(MIC) {
@@ -151,7 +154,7 @@ for (Luque_event_name in names(Luque_events)) {
       PTA_DVf = Luque_PTA_DVf,
       PTA_DVCSF = Luque_PTA_DVCSF,
       Dosing = Luque_Dosing,
-      Model = Model  # Remove prefix from the Model column
+      Model = Model  # Keep the Model column
     )
 
   # Store the PTA results for each event
@@ -160,7 +163,6 @@ for (Luque_event_name in names(Luque_events)) {
 
 # Combine all PTA results into one data frame
 Luque_PTA_combined_results <- bind_rows(Luque_PTA_results)
-
 
 
 
@@ -233,8 +235,6 @@ dxdt_AUCCSF = DVCSF;
 
 $CAPTURE DV DVf DVCSF'
 
-library(mrgsolve)
-library(dplyr)
 
 # Define the Li model
 Li_mod <- mrgsolve::mcode("Li_optim", Li, atol=1e-8, rtol=1e-8, maxsteps=5000)
@@ -269,22 +269,21 @@ for (Li_event_name in names(Li_events)) {
     as.data.frame() %>%
     filter(time >= 72 & time <= 96)
   
-  # Function to calculate % of patients with fT > MIC = 100%
-  calc_pta_for_MIC <- function(data, MIC) {
-    # Group by ID and check if 100% of the time is above the MIC
-    Li_pta_DVf <- data %>%
-      group_by(ID) %>%
-      summarize(fT_above_MIC = mean(DVf >= MIC)) %>%
-      summarize(Li_PTA_DVf = mean(fT_above_MIC == 1) * 100)  # % of patients with fT > MIC = 100%
-    
-    Li_pta_DVCSF <- data %>%
-      group_by(ID) %>%
-      summarize(fT_above_MIC = mean(DVCSF >= MIC)) %>%
-      summarize(Li_PTA_DVCSF = mean(fT_above_MIC == 1) * 100)  # % of patients with fT > MIC = 100%
-    
-    return(c(Li_PTA_DVf = Li_pta_DVf$Li_PTA_DVf, Li_PTA_DVCSF = Li_pta_DVCSF$Li_PTA_DVCSF))
-  }
+# Function to calculate % of patients with fT > MIC for at least 85% of the time
+calc_pta_for_MIC <- function(data, MIC) {
+  # Group by ID and check if >= 85% of the time is above the MIC
+  Li_pta_DVf <- data %>%
+    group_by(ID) %>%
+    summarize(fT_above_MIC = mean(DVf >= MIC)) %>%
+    summarize(Li_PTA_DVf = mean(fT_above_MIC >= 0.85) * 100)  # % of patients with fT > MIC for >= 85% of the time
   
+  Li_pta_DVCSF <- data %>%
+    group_by(ID) %>%
+    summarize(fT_above_MIC = mean(DVCSF >= MIC)) %>%
+    summarize(Li_PTA_DVCSF = mean(fT_above_MIC >= 0.85) * 100)  # % of patients with fT > MIC for >= 85% of the time
+  
+  return(c(Li_PTA_DVf = Li_pta_DVf$Li_PTA_DVf, Li_PTA_DVCSF = Li_pta_DVCSF$Li_PTA_DVCSF))
+}
   # Calculate PTA for each MIC value
   Li_PTA_fractions <- sapply(MIC_values, function(MIC) {
     calc_pta_for_MIC(Li_out_72_96, MIC)
@@ -388,6 +387,76 @@ combined_results_AUC <- bind_rows(Luque_all_results, Li_all_results)
 combined_results_fT <- bind_rows(Luque_PTA_combined_results, Li_PTA_combined_results)
 
 combined_results_AUC$Model <- factor(combined_results_AUC$Model, levels = c("Li","Luque"))
+
+# Load necessary libraries
+library(dplyr)
+
+# Filter data where time is between 72 and 96 hours, then group and summarize
+min_values <- combined_results_sim %>%
+  filter(time >= 72 & time <= 96) %>%
+  group_by(Dosing, Model, ID) %>%
+  summarise(
+    min_DVf = min(DVf, na.rm = TRUE),
+    min_DVCSF = min(DVCSF, na.rm = TRUE)
+  )
+
+
+# Assuming your min_values dataset is the one you displayed
+# and combined_results_AUC is your second dataset
+
+# Merge the two datasets by ID, Dosing, and Model
+merged_results <- min_values %>%
+  inner_join(combined_results_AUC, by = c("ID", "Dosing", "Model"))
+
+
+
+
+# Compute statistics for AUCP_72_96 and AUCCSF_72_96
+summary_stats <- merged_results %>%
+  dplyr::group_by(Dosing, Model) %>%
+  dplyr::summarise(
+    Mean_AUCP = mean(AUCP_72_96),
+    SD_AUCP = sd(AUCP_72_96),
+    Median_AUCP = median(AUCP_72_96),
+    IQR_AUCP = IQR(AUCP_72_96),
+    Mean_AUCCSF = mean(AUCCSF_72_96),
+    SD_AUCCSF = sd(AUCCSF_72_96),
+    Median_AUCCSF = median(AUCCSF_72_96),
+    IQR_AUCCSF = IQR(AUCCSF_72_96),
+    Mean_DVf = mean(min_DVf),
+    SD_DVf = sd(min_DVf),
+    Median_DVf = median(min_DVf),
+    IQR_DVf = IQR(min_DVf),
+    Mean_DVCSF = mean(min_DVCSF),
+    SD_DVCSF = sd(min_DVCSF),
+    Median_DVCSF = median(min_DVCSF),
+    IQR_DVCSF = IQR(min_DVCSF)
+  )
+
+summary_stats <- summary_stats %>%
+  mutate(across(where(is.numeric), ~ sprintf("%.2f", .x)))
+
+
+
+# Create a flextable from the formatted summary_stats dataframe
+summary_table <- flextable(summary_stats)
+
+# Adjust the table appearance for publication
+summary_table <- summary_table %>%
+  theme_vanilla() %>%                  # Apply a clean vanilla theme
+  bold(part = "header") %>%            # Make header bold
+  align(align = "center", part = "header") %>%  # Center-align header
+  align(align = "right", part = "body") %>%     # Right-align numeric data
+  autofit() %>%                        # Adjust column widths to fit content
+  fontsize(size = 10, part = "all")     # Set font size
+
+# Create a Word document and add the formatted table
+doc <- read_docx() %>%
+  body_add_flextable(value = summary_table)
+
+# Save the Word document
+print(doc, target = "summary_stats_table.docx")
+
 
 
 
@@ -637,172 +706,15 @@ dev.off()
 
 
 
+
+
 # Convert MIC to a factor variable
 combined_results_fT$MIC <- factor(combined_results_fT$MIC, levels = c(0.25, 0.5, 1, 2, 4, 8, 16, 32))
 
 # Reorder the Dosing variable
 combined_results_fT$Dosing <- factor(combined_results_fT$Dosing, levels = c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI"))
 
-# PTA plot for Plasma with geom_point for black points and different shapes by Model
-PTA_fT_Plasma <- ggplot(combined_results_fT, aes(x = MIC, y = PTA_DVf, color = Model, shape = Model)) + 
-  geom_line(aes(group = Model), size = 1.5) +  # Line plot for PTA curves
-  geom_point(color = "black", size = 3) +  # Black points with different shapes for Model
-  geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +  # Dashed line at 90% PTA
-  scale_color_jco() +  # Use the JCO color scheme
-  scale_y_continuous(breaks = seq(0, 100, by = 10)) +  # Y-axis limits and breaks
-  facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
-  xlab("MIC (mg/L)") + 
-  ylab("PTA (%)") +
-  ggtitle("PTA (fT>MIC 100% for plasma LZD concentration") + 
-  my_theme + 
-  theme(
-    strip.background = element_blank(),   # Clean up facet strip background
-    strip.placement = "outside"           # Position facet strips outside the plot
-  )
 
-# PTA plot for CSF with geom_point for black points and different shapes by Model
-PTA_fT_CSF <- ggplot(combined_results_fT, aes(x = MIC, y = PTA_DVCSF, color = Model, shape = Model)) + 
-  geom_line(aes(group = Model), size = 1.5) +  # Line plot for PTA curves
-  geom_point(color = "black", size = 3) +  # Black points with different shapes for Model
-  geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +  # Dashed line at 90% PTA
-  scale_color_jco() +  # Use the JCO color scheme
-  scale_y_continuous(breaks = seq(0, 100, by = 10)) +  # Y-axis limits and breaks
-  facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
-  xlab("MIC (mg/L)") + 
-  ylab("PTA (%)") +
-  ggtitle("PTA (fT>MIC 100% for CSF LZD concentration") + 
-  my_theme + 
-  theme(
-    strip.background = element_blank(),   # Clean up facet strip background
-    strip.placement = "outside"           # Position facet strips outside the plot
-  )
-
-# Combine both plots
-combined_plot_PTA <- ggarrange(PTA_fT_Plasma, PTA_fT_CSF, 
-                               ncol = 1, nrow = 2,  # Arrange plots vertically
-                               labels = c("A", "B"),  # Add labels to the plots (optional)
-                               common.legend = TRUE,  # Use a common legend for both plots
-                               legend = "top")  # Position the legend at the top
-
-
-
-png("D:/MOBILITE/Charles B/VF/PTA_Plot.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
-
-# Print the plot to the device
-print(combined_plot_PTA)
-
-# Close the device
-dev.off()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# Function to compute PTA for AUC/MIC > 100
-compute_pta_AUC_MIC <- function(data, MIC) {
-  # Compute the AUC/MIC ratio for both AUCP and AUCCSF
-  data <- data %>%
-    mutate(
-      AUC_MIC_Plasma = AUCP_72_96 / MIC,  # AUC/MIC for plasma
-      AUC_MIC_CSF = AUCCSF_72_96 / MIC    # AUC/MIC for CSF
-    )
-  
-  # Check if AUC/MIC > 100
-  data <- data %>%
-    mutate(
-      PTA_Plasma = AUC_MIC_Plasma > 100,
-      PTA_CSF = AUC_MIC_CSF > 100
-    )
-  
-  # Summarize the PTA for each MIC, Dosing, and Model
-  summary_data <- data %>%
-    group_by(Dosing, Model) %>%
-    summarize(
-      PTA_AUCMIC_Plasma = mean(PTA_Plasma) * 100,  # % of individuals where AUC/MIC > 100 in plasma
-      PTA_AUCMIC_CSF = mean(PTA_CSF) * 100,   # % of individuals where AUC/MIC > 100 in CSF
-      .groups = 'drop'
-    )
-  
-  # Add the MIC value as a column for each summarized data
-  summary_data <- summary_data %>%
-    mutate(MIC = MIC)
-  
-  return(summary_data)
-}
-
-# Loop over each MIC value and compute the PTA for each
-PTA_AUC_results <- lapply(MIC_values, function(MIC) {
-  compute_pta_AUC_MIC(combined_results_AUC, MIC)
-})
-
-# Combine the PTA results for all MIC values into one data frame
-combined_PTA_AUC_results <- bind_rows(PTA_AUC_results)
-
-# Create the PTA plot for AUC/MIC > 100 for plasma
-PTA_AUC_Plasma <- ggplot(combined_PTA_AUC_results, aes(x = factor(MIC), y = PTA_AUCMIC_Plasma, color = Model, shape = Model)) + 
-  geom_line(aes(group = Model), size = 1.5) +  # Line plot for PTA curves
-  geom_point(color = "black", size = 3) +  # Black points with different shapes for Model
-  geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +  # Dashed line at 90% PTA
-  scale_color_jco() +  # Use the JCO color scheme
-  scale_y_continuous(breaks = seq(0, 100, by = 10)) +  # Y-axis limits and breaks
-  facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
-  xlab("MIC (mg/L)") + 
-  ylab("PTA (%)") +
-  ggtitle("PTA (AUC/MIC > 100 for plasma LZD concentration") + 
-  my_theme + 
-  theme(
-    strip.background = element_blank(),   # Clean up facet strip background
-    strip.placement = "outside"           # Position facet strips outside the plot
-  )
-
-# Create the PTA plot for AUC/MIC > 100 for CSF
-PTA_AUC_CSF <- ggplot(combined_PTA_AUC_results, aes(x = factor(MIC), y = PTA_AUCMIC_CSF, color = Model, shape = Model)) + 
-  geom_line(aes(group = Model), size = 1.5) +  # Line plot for PTA curves
-  geom_point(color = "black", size = 3) +  # Black points with different shapes for Model
-  geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +  # Dashed line at 90% PTA
-  scale_color_jco() +  # Use the JCO color scheme
-  scale_y_continuous(breaks = seq(0, 100, by = 10)) +  # Y-axis limits and breaks
-  facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
-  xlab("MIC (mg/L)") + 
-  ylab("PTA (%)") +
-  ggtitle("PTA (AUC/MIC > 100 for CSF LZD concentration") + 
-  my_theme + 
-  theme(
-    strip.background = element_blank(),   # Clean up facet strip background
-    strip.placement = "outside"           # Position facet strips outside the plot
-  )
-
-# Combine the Plasma and CSF plots for AUC/MIC > 100
-combined_plot_AUC_MIC <- ggarrange(PTA_AUC_Plasma, PTA_AUC_CSF, 
-                                   ncol = 1, nrow = 2,  # Arrange plots vertically
-                                   labels = c("A", "B"),  # Add labels to the plots (optional)
-                                   common.legend = TRUE,  # Use a common legend for both plots
-                                   legend = "top")  # Position the legend at the top
-
-
-
-png("D:/MOBILITE/Charles B/VF/PTA_AUC_Plot.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
-
-# Print the plot to the device
-print(combined_plot_AUC_MIC)
-
-# Close the device
-dev.off()
 
 
 
@@ -903,12 +815,6 @@ print(filtered_mic_distribution)
 
 
 
-
-
-# Load required libraries
-library(ggplot2)
-library(ggpubr)
-
 # Assuming the filtered_mic_distribution contains the MIC frequencies
 # Merge MIC frequency data with PTA data (combined_PTA_AUC_results)
 combined_PTA_AUC_results <- merge(combined_PTA_AUC_results, filtered_mic_distribution, by.x = "MIC", by.y = "MIC_value")
@@ -1001,7 +907,7 @@ PTA_fT_Plasma <- ggplot(combined_results_fT %>% filter(Model == "Li"), aes(x = f
   facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) and MIC Distribution (%)") +
-  ggtitle("PTA (fT > MIC for plasma LZD concentration)") + 
+  ggtitle("PTA (fT > MIC 85% for plasma LZD concentration)") + 
   my_theme + 
   theme(
     strip.background = element_blank(),   # Clean up facet strip background
@@ -1023,7 +929,7 @@ PTA_fT_CSF <- ggplot(combined_results_fT %>% filter(Model == "Li"), aes(x = fact
   facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) and MIC Distribution (%)") +
-  ggtitle("PTA (fT > MIC for CSF LZD concentration)") + 
+  ggtitle("PTA (fT > MIC 85% for CSF LZD concentration)") + 
   my_theme + 
   theme(
     strip.background = element_blank(),   # Clean up facet strip background
@@ -1056,11 +962,9 @@ print(combined_plot_PTA_fT)
 dev.off()
 
 
-# Load necessary libraries
-library(dplyr)
-library(tidyr)
-library(flextable)
-library(officer)
+
+
+
 
 # Step 1: Filter only the necessary columns and reshape using pivot_wider to make MIC values as columns
 summary_table_fT <- combined_results_fT %>%
@@ -1109,7 +1013,7 @@ print(doc, target = "PTA_Summary_Table.docx")
 combined_results_AUC <- rbind(Luque_PTA_combined_results,Li_PTA_combined_results)
 combined_results_AUC$Criteria <- as.factor("AUC")
 combined_results_fT$Criteria <- as.factor("fT")
-combined_table<- rbind(combined_results_fT,combined_results_AUC)
+combined_table<- rbind(combined_results_fT[,c(1:5,9)],combined_results_AUC)
 
 # Ensure the MIC column is of the same type (factor)
 combined_results_fT$MIC <- as.factor(combined_results_fT$MIC)
@@ -1143,91 +1047,83 @@ df_PTA_DVCSF <- merged_data %>%
 
 
 
-ft_DVCSF <- df_PTA_DVCSF_grouped %>%
-    pivot_wider(names_from = c(MIC, Model), values_from = PTA_DVCSF) %>%
-    flextable() %>%
-    # Merge the Dosing rows so that each Dosing has two subrows (one for each Criteria)
-    merge_v(j = "Dosing") %>%
-    merge_v(j = "Criteria") %>%
-    # Set custom header labels
-    set_header_labels(
-        Dosing = "Dosing Regimen", 
-        Criteria = "Criteria",
-        `0.25_Li` = "Li (MIC = 0.25)", `0.25_Luque` = "Luque (MIC = 0.25)",
-        `0.5_Li` = "Li (MIC = 0.5)", `0.5_Luque` = "Luque (MIC = 0.5)",
-        `1_Li` = "Li (MIC = 1)", `1_Luque` = "Luque (MIC = 1)",
-        `2_Li` = "Li (MIC = 2)", `2_Luque` = "Luque (MIC = 2)",
-        `4_Li` = "Li (MIC = 4)", `4_Luque` = "Luque (MIC = 4)",
-        `8_Li` = "Li (MIC = 8)", `8_Luque` = "Luque (MIC = 8)",
-        `16_Li` = "Li (MIC = 16)", `16_Luque` = "Luque (MIC = 16)",
-        `32_Li` = "Li (MIC = 32)", `32_Luque` = "Luque (MIC = 32)"
-    ) %>%
-    # Add a custom header row
-    add_header_row(
-        values = c("Dosing Regimen", "Criteria", "MIC = 0.25", "MIC = 0.5", "MIC = 1", "MIC = 2", "MIC = 4", "MIC = 8", "MIC = 16", "MIC = 32"), 
-        colwidths = c(1, 1, 2, 2, 2, 2, 2, 2, 2, 2)
-    ) %>%
-    # Style the table
-    bold(part = "header") %>%
-    autofit() %>%
-    theme_booktabs() %>%
-    fontsize(size = 10, part = "all")
 
-# Export the CSF table to Word using officer
+# Define custom order for Dosing and Criteria
+df_PTA_DVf <- df_PTA_DVf %>%
+  mutate(Dosing = factor(Dosing, levels = c("600q12h", "600q8h", "600q6h", 
+                                            "1200q24hCI", "1800q24hCI", "2400q24hCI")),
+         Criteria = factor(Criteria, levels = c("fT", "AUC"))) # Ensure fT comes before AUC
+
+# Sort the dataframe by Criteria, Dosing, and Model
+df_PTA_DVf <- df_PTA_DVf %>%
+  arrange(Criteria, Dosing, Model)
+
+# Pivot the data to have MIC in columns, and Li & Luque side by side
+df_PTA_DVf_wide <- df_PTA_DVf %>%
+  pivot_wider(names_from = c(MIC, Model), values_from = PTA_DVf, 
+              names_sep = "_", names_sort = TRUE)
+
+# Convert to flextable for Word export
+ft <- flextable(df_PTA_DVf_wide)
+
+# Export to Word document
 doc <- read_docx() %>%
-    body_add_flextable(value = ft_DVCSF) %>%
-    body_add_par("PTA Summary Table for CSF", style = "heading 1")
+  body_add_flextable(ft)
 
-print(doc, target = "PTA_Summary_Table_CSF.docx")
+# Save the document
+print(doc, target = "PTA_DVf.docx")
 
 
 
-df_PTA_DVf_grouped <- df_PTA_DVf %>%
-    arrange(Dosing, Criteria, Model)
-ft_DVf <- df_PTA_DVf_grouped %>%
-    pivot_wider(names_from = c(MIC, Model), values_from = PTA_DVf) %>%
-    flextable() %>%
-    # Merge the Dosing rows so that each Dosing has two subrows (one for each Criteria)
-    merge_v(j = "Dosing") %>%
-    merge_v(j = "Criteria") %>%
-    # Set custom header labels
-    set_header_labels(
-        Dosing = "Dosing Regimen", 
-        Criteria = "Criteria",
-        `0.25_Li` = "Li (MIC = 0.25)", `0.25_Luque` = "Luque (MIC = 0.25)",
-        `0.5_Li` = "Li (MIC = 0.5)", `0.5_Luque` = "Luque (MIC = 0.5)",
-        `1_Li` = "Li (MIC = 1)", `1_Luque` = "Luque (MIC = 1)",
-        `2_Li` = "Li (MIC = 2)", `2_Luque` = "Luque (MIC = 2)",
-        `4_Li` = "Li (MIC = 4)", `4_Luque` = "Luque (MIC = 4)",
-        `8_Li` = "Li (MIC = 8)", `8_Luque` = "Luque (MIC = 8)",
-        `16_Li` = "Li (MIC = 16)", `16_Luque` = "Luque (MIC = 16)",
-        `32_Li` = "Li (MIC = 32)", `32_Luque` = "Luque (MIC = 32)"
-    ) %>%
-    # Add a custom header row
-    add_header_row(
-        values = c("Dosing Regimen", "Criteria", "MIC = 0.25", "MIC = 0.5", "MIC = 1", "MIC = 2", "MIC = 4", "MIC = 8", "MIC = 16", "MIC = 32"), 
-        colwidths = c(1, 1, 2, 2, 2, 2, 2, 2, 2, 2)
-    ) %>%
-    # Style the table
-    bold(part = "header") %>%
-    autofit() %>%
-    theme_booktabs() %>%
-    fontsize(size = 10, part = "all")
 
-# Export the CSF table to Word using officer
+
+
+
+
+# Create a dataframe with only PTA_DVCSF data
+df_PTA_DVCSF <- merged_data %>%
+  select(MIC, PTA_DVCSF, Dosing, Model, Criteria)
+
+# Create a dataframe with only PTA_DVCSF data
+df_PTA_DVCSF <- merged_data %>%
+  select(MIC, PTA_DVCSF, Dosing, Model, Criteria)
+
+
+
+
+# Define custom order for Dosing and Criteria
+df_PTA_DVCSF <- df_PTA_DVCSF %>%
+  mutate(Dosing = factor(Dosing, levels = c("600q12h", "600q8h", "600q6h", 
+                                            "1200q24hCI", "1800q24hCI", "2400q24hCI")),
+         Criteria = factor(Criteria, levels = c("fT", "AUC"))) # Ensure fT comes before AUC
+
+# Sort the dataframe by Criteria, Dosing, and Model
+df_PTA_DVCSF <- df_PTA_DVCSF %>%
+  arrange(Criteria, Dosing, Model)
+
+# Pivot the data to have MIC in columns, and Li & Luque side by side
+df_PTA_DVCSF_wide <- df_PTA_DVCSF %>%
+  pivot_wider(names_from = c(MIC, Model), values_from = PTA_DVCSF, 
+              names_sep = "_", names_sort = TRUE)
+
+# Convert to flextable for Word export
+ft <- flextable(df_PTA_DVCSF_wide)
+
+
+
+# Export to Word document
 doc <- read_docx() %>%
-    body_add_flextable(value = ft_DVf) %>%
-    body_add_par("PTA Summary Table for CSF", style = "heading 1")
+  body_add_flextable(ft)
 
-print(doc, target = "PTA_Summary_Table_Plasma.docx")
-
+# Save the document
+print(doc, target = "PTA_CSF.docx")
 
 
 
 
 long_data <- mic_distribution %>%
   select(-Average_MIC) %>%  # Exclude the Average_MIC column
-  pivot_longer(
+  tidyr::pivot_longer(
     cols = c("Staphylococcus_spp", "Enterococcus_spp", "Cutibacterium_acnes", "Streptococcus_spp"),
     names_to = "Species",
     values_to = "Count"
@@ -1237,23 +1133,6 @@ long_data <- mic_distribution %>%
 long_data <- long_data %>%
   group_by(Species) %>%
   mutate(Frequency = Count / sum(Count) * 100)  # Calculate percentage frequency
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -1347,10 +1226,6 @@ labels <- paste0(c("Staphylococcus spp: ", "Enterococcus spp: ",
 subtitle_text <- paste(labels[1], labels[2], "\n", labels[3], labels[4], "\n", labels[5])
 
 
-
-
-
-
 MIC_Distrib<-ggplot(combined_data, aes(x = MIC_value, y = Percentage, fill = Species)) +
   geom_bar(stat = "identity", position = position_dodge(width = 0.8), 
            color = ifelse(combined_data$Species == "Total Distribution", "black", NA),  # Add black border for Total Distribution
@@ -1373,15 +1248,6 @@ MIC_Distrib<-ggplot(combined_data, aes(x = MIC_value, y = Percentage, fill = Spe
 
 
 
-
-
-
 png("D:/MOBILITE/Charles B/VF/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
-
-# Print the plot to the device
 print(MIC_Distrib)
-
-# Close the device
 dev.off()
-
-
