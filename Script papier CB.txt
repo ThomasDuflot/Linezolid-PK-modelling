@@ -591,25 +591,38 @@ summary_stats <- min_values %>%
     Mean_AUCP = mean(AUCP_72_96),
     SD_AUCP = sd(AUCP_72_96),
     Median_AUCP = median(AUCP_72_96),
-    IQR_AUCP = IQR(AUCP_72_96),
+    Q1_AUCP = quantile(AUCP_72_96, 0.25),
+    Q3_AUCP = quantile(AUCP_72_96, 0.75),
     Mean_AUCCSF = mean(AUCCSF_72_96),
     SD_AUCCSF = sd(AUCCSF_72_96),
     Median_AUCCSF = median(AUCCSF_72_96),
-    IQR_AUCCSF = IQR(AUCCSF_72_96),
+    Q1_AUCCSF = quantile(AUCCSF_72_96, 0.25),
+    Q3_AUCCSF = quantile(AUCCSF_72_96, 0.75),
     Mean_DVf = mean(min_DVf),
     SD_DVf = sd(min_DVf),
     Median_DVf = median(min_DVf),
-    IQR_DVf = IQR(min_DVf),
+    Q1_DVf = quantile(min_DVf, 0.25),
+    Q3_DVf = quantile(min_DVf, 0.75),
     Mean_DVCSF = mean(min_DVCSF),
     SD_DVCSF = sd(min_DVCSF),
     Median_DVCSF = median(min_DVCSF),
-    IQR_DVCSF = IQR(min_DVCSF)
+    Q1_DVCSF = quantile(min_DVCSF, 0.25),
+    Q3_DVCSF = quantile(min_DVCSF, 0.75)
   )
 
+# Format results as "Mean ± SD" and "Median [25th-75th]" with rounding to 1 decimal place
 summary_stats <- summary_stats %>%
-  mutate(across(where(is.numeric), ~ sprintf("%.2f", .x)))
-
-
+  dplyr::mutate(
+    AUCP = paste0(sprintf("%.1f", Mean_AUCP), " ± ", sprintf("%.1f", SD_AUCP)),
+    AUCP_Median = paste0(sprintf("%.1f", Median_AUCP), " [", sprintf("%.1f", Q1_AUCP), "-", sprintf("%.1f", Q3_AUCP), "]"),
+    AUCCSF = paste0(sprintf("%.1f", Mean_AUCCSF), " ± ", sprintf("%.1f", SD_AUCCSF)),
+    AUCCSF_Median = paste0(sprintf("%.1f", Median_AUCCSF), " [", sprintf("%.1f", Q1_AUCCSF), "-", sprintf("%.1f", Q3_AUCCSF), "]"),
+    DVf = paste0(sprintf("%.1f", Mean_DVf), " ± ", sprintf("%.1f", SD_DVf)),
+    DVf_Median = paste0(sprintf("%.1f", Median_DVf), " [", sprintf("%.1f", Q1_DVf), "-", sprintf("%.1f", Q3_DVf), "]"),
+    DVCSF = paste0(sprintf("%.1f", Mean_DVCSF), " ± ", sprintf("%.1f", SD_DVCSF)),
+    DVCSF_Median = paste0(sprintf("%.1f", Median_DVCSF), " [", sprintf("%.1f", Q1_DVCSF), "-", sprintf("%.1f", Q3_DVCSF), "]")
+  ) %>%
+  select(Dosing, Model, AUCP, AUCP_Median, AUCCSF, AUCCSF_Median, DVf, DVf_Median, DVCSF, DVCSF_Median)
 
 # Create a flextable from the formatted summary_stats dataframe
 summary_table <- flextable(summary_stats)
