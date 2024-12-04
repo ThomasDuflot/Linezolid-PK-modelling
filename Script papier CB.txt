@@ -6,7 +6,7 @@ library(ggsci)
 library(flextable)
 library(officer)
 library(tidyr)
-Library(reshape2)
+library(reshape2)
 
 setwd("D:/MOBILITE/Charles B/VF/")
 
@@ -102,7 +102,6 @@ Luque_events <- list(
 )
 
 n_individuals <- 1000
-Luque_results <- list()
 Luque_model_name <- "Luque"  # Add the model name here
 MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
 
@@ -251,7 +250,6 @@ Li_events <- list(
 )
 
 n_individuals <- 1000
-Li_results <- list()
 Li_model_name <- "Li"  # Add the model name here
 MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
 
@@ -313,6 +311,11 @@ calc_pta_for_MIC <- function(data, MIC) {
 # Combine all PTA results into one data frame
 Li_PTA_combined_results <- bind_rows(Li_PTA_results)
 
+combined_results_fT <- bind_rows(Luque_PTA_combined_results, Li_PTA_combined_results)
+combined_results_fT$Model <- factor(combined_results_fT$Model, levels = c("Li","Luque"))
+
+
+
 
 
 
@@ -320,7 +323,6 @@ Li_PTA_combined_results <- bind_rows(Li_PTA_results)
 
 
 n_individuals <- 1000
-Luque_results <- list()
 Luque_model_name <- "Li"  # Add the model name here
 MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
 
@@ -354,11 +356,11 @@ for (Luque_event_name in names(Luque_events)) {
     # Calculate the AUC/MIC ratio and determine if it is greater than 10
     Luque_pta_AUCP <- data %>%
       mutate(AUC_MIC_P = AUCP_72_96 / MIC) %>% 
-      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 10
+      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 100
     
     Luque_pta_AUCCSF <- data %>%
       mutate(AUC_MIC_CSF = AUCCSF_72_96 / MIC) %>%
-      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 10
+      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 100
     
     return(c(PTA_AUCP = Luque_pta_AUCP$PTA_AUCP, PTA_AUCCSF = Luque_pta_AUCCSF$PTA_AUCCSF))
   }
@@ -389,7 +391,6 @@ Luque_AUC_combined_results <- bind_rows(Luque_AUC_PTA_results)
 
 
 n_individuals <- 1000
-Li_results <- list()
 Li_model_name <- "Li"  # Add the model name here
 MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
 
@@ -454,37 +455,61 @@ Li_AUC_combined_results <- bind_rows(Li_AUC_PTA_results)
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 combined_results_AUC <- bind_rows(Luque_AUC_combined_results, Li_AUC_combined_results)
 combined_results_AUC$Model <- factor(combined_results_AUC$Model, levels = c("Li","Luque"))
 
-combined_results_fT <- bind_rows(Luque_PTA_combined_results, Li_PTA_combined_results)
-combined_results_fT$Model <- factor(combined_results_fT$Model, levels = c("Li","Luque"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Now we need to add dosing regimen to the existing Luque simulation outputs
+Luque_results <- list()
+
+for (Luque_event_name in names(Luque_events)) {
+  Luque_ev_current <- Luque_events[[Luque_event_name]]
+  
+  # Run the simulation for the current event
+  Luque_out <- Luque_mod %>%
+    ev(Luque_ev_current) %>%
+    mrgsim(nid = n_individuals, delta = 0.1, end = 96, obsonly = TRUE)
+  
+  # Add Dosing Regimen and Model Name to Luque_out
+  Luque_out_data <- Luque_out@data %>%
+    mutate(Dosing = Luque_event_name, Model = "Luque")
+  
+  # Store the results
+  Luque_results[[Luque_event_name]] <- Luque_out_data
+}
+
+# Combine all results from the Luque model into a single data frame
+Luque_combined_results <- bind_rows(Luque_results)
+
 
 
 
@@ -526,31 +551,6 @@ for (Li_event_name in names(Li_events)) {
 Li_combined_results <- bind_rows(Li_results)
 
 
-
-
-
-
-# Now we need to add dosing regimen to the existing Luque simulation outputs
-Luque_results <- list()
-
-for (Luque_event_name in names(Luque_events)) {
-  Luque_ev_current <- Luque_events[[Luque_event_name]]
-  
-  # Run the simulation for the current event
-  Luque_out <- Luque_mod %>%
-    ev(Luque_ev_current) %>%
-    mrgsim(nid = n_individuals, delta = 0.1, end = 96, obsonly = TRUE)
-  
-  # Add Dosing Regimen and Model Name to Luque_out
-  Luque_out_data <- Luque_out@data %>%
-    mutate(Dosing = Luque_event_name, Model = "Luque")
-  
-  # Store the results
-  Luque_results[[Luque_event_name]] <- Luque_out_data
-}
-
-# Combine all results from the Luque model into a single data frame
-Luque_combined_results <- bind_rows(Luque_results)
 
 
 
@@ -749,7 +749,7 @@ dev.off()
 
 
 
-
+combined_PTA_AUC_results<-combined_results_AUC
 
 
 
@@ -916,7 +916,7 @@ combined_results_fT$Dosing <- factor(combined_results_fT$Dosing, levels = c("600
 combined_results_fT$MIC_Distribution <- "MIC Frequency (%)"
 
 PTA_fT_Plasma <- ggplot(combined_results_fT %>% filter(Model == "Li"), aes(x = factor(MIC))) + 
-  geom_bar(aes(y = Percent_Frequency.x, fill = MIC_Distribution), stat = "identity", alpha = 0.5, width = 0.75) +  # MIC frequency as bars (for one model)
+  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution), stat = "identity", alpha = 0.5, width = 0.75) +  # MIC frequency as bars (for one model)
   geom_line(data = combined_results_fT, aes(x = factor(MIC), y = PTA_DVf, group = Model, color = Model), size = 1.5) +  # Line plot for PTA curves for both models
   geom_point(data = combined_results_fT, aes(x = factor(MIC), y = PTA_DVf, shape = Model), color = "black", size = 3) +  # Black points with different shapes for both models
   geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +  # Dashed line at 90% PTA
