@@ -311,8 +311,199 @@ calc_pta_for_MIC <- function(data, MIC) {
 # Combine all PTA results into one data frame
 Li_PTA_combined_results <- bind_rows(Li_PTA_results)
 
-combined_results_fT <- bind_rows(Luque_PTA_combined_results, Li_PTA_combined_results)
-combined_results_fT$Model <- factor(combined_results_fT$Model, levels = c("Li","Luque"))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Define the PK model
+DF <- '
+$PROB
+$PARAM @annotated
+TVCL : 8.38  : 1  Clearance (L.h-1)
+TVVC : 36.4  : 2  Central volume (L)
+TVVCSF : 0.15 : CSF Volume (L)
+TVVEVD ! 0.15 : CSF samples collected via the EVD
+TVQCSFin : 0.04 : Intercompartimental clearance CSF (L.h-1)
+TVQCSFout : 0.0367 : Intercompartimental clearance CSF (L.h-1)
+TVCLEVD : 0.0102 : Clearance EVD
+
+$PARAM @annotated @covariates
+
+WT : 74 : Creatinine clearance (mL/min/1.73m²)
+WT_VC : 0.0115 : Coefficient of the linear relationship between V1pop and patient weight
+
+
+$OMEGA @block
+0.052 // VC
+0 0.187 // CL
+0 0 0.02225 // QCSFin
+0 0 0 0 0.209765 // CLEVD
+
+
+$SIGMA 
+0 // err prop
+0 //  err additive
+
+
+$CMT @annotated
+CENTRAL : Central compartment (mg/L) [ADM] [OBS]
+CSF : CSF compartment (mg/L) [OBS]
+AUCP : AUC in Plasma (mg/L.h)
+AUCCSF : AUC in CSF (mg/L.h)
+
+
+$TABLE
+double DV  = (CENTRAL / VC) ;
+double DVCSF = (CSF / VCSF);
+double DVf = DV*0.69;
+
+$MAIN
+double CL = TVCL *exp(ETA(1))   ;
+double VC = TVVC *(1+0.0115*(WT-74)*exp(ETA(2)))  ;
+double VCSF = TVVCSF ;
+double QCSFin = TVQCSFin *exp(ETA(4)) ;
+double QCSFout = TVQCSFout * exp(ETA(5));
+double K10 = CL/VC;
+double K12 = QCSFin/VC;
+double K21 = QCSFout/VCSF;
+
+
+
+$ODE
+
+dxdt_CENTRAL      = -K10* CENTRAL - K12*CENTRAL + K21*CSF  ;
+dxdt_CSF    = K12*CENTRAL - K21*CSF ;
+dxdt_AUCP = DVf;
+dxdt_AUCCSF = DVCSF;
+
+$CAPTURE DV DVf DVCSF'
+
+
+# Define the DF model
+DF_mod <- mrgsolve::mcode("DF_optim", DF, atol=1e-8, rtol=1e-8, maxsteps=5000)
+
+# Define the dosing events with DF_ prefix
+DF_events <- list(
+  `600q12h` = ev(amt = 600, rate = 1200, cmt = 1, ii = 12, addl = 20),
+  `600q8h` = ev(amt = 600, rate = 1200, cmt = 1, ii = 8, addl = 20),
+  `600q6h` = ev(amt = 600, rate = 1200, cmt = 1, ii = 6, addl = 20),
+  `1200q24hCI` = ev(amt = 4800, rate = 50, cmt = 1, ii = 0, addl = 0),
+  `1800q24hCI` = ev(amt = 7200, rate = 75, cmt = 1, ii = 0, addl = 0),
+  `2400q24hCI` = ev(amt = 9600, rate = 100, cmt = 1, ii = 0, addl = 0)
+)
+
+n_individuals <- 1000
+DF_model_name <- "DF"  # Add the model name here
+MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
+
+DF_PTA_results <- list()  # Store PTA results with DF_ prefix
+
+for (DF_event_name in names(DF_events)) {
+  DF_ev_current <- DF_events[[DF_event_name]]
+  
+  # Run the simulation for the current event
+  DF_out <- DF_mod %>%
+    ev(DF_ev_current) %>%
+    mrgsim(nid = n_individuals, delta = 0.1, end = 96, obsonly = TRUE)
+  
+  # Extract data for time points between 72 and 96 hours
+  DF_out_72_96 <- DF_out %>%
+    as.data.frame() %>%
+    filter(time >= 72 & time <= 96)
+  
+# Function to calculate % of patients with fT > MIC for at least 85% of the time
+calc_pta_for_MIC <- function(data, MIC) {
+  # Group by ID and check if >= 85% of the time is above the MIC
+  DF_pta_DVf <- data %>%
+    group_by(ID) %>%
+    summarize(fT_above_MIC = mean(DVf >= MIC)) %>%
+    summarize(DF_PTA_DVf = mean(fT_above_MIC >= 0.85) * 100)  # % of patients with fT > MIC for >= 85% of the time
+  
+  DF_pta_DVCSF <- data %>%
+    group_by(ID) %>%
+    summarize(fT_above_MIC = mean(DVCSF >= MIC)) %>%
+    summarize(DF_PTA_DVCSF = mean(fT_above_MIC >= 0.85) * 100)  # % of patients with fT > MIC for >= 85% of the time
+  
+  return(c(DF_PTA_DVf = DF_pta_DVf$DF_PTA_DVf, DF_PTA_DVCSF = DF_pta_DVCSF$DF_PTA_DVCSF))
+}
+  # Calculate PTA for each MIC value
+  DF_PTA_fractions <- sapply(MIC_values, function(MIC) {
+    calc_pta_for_MIC(DF_out_72_96, MIC)
+  })
+  
+  # Convert to data frame and store results
+  DF_PTA_fractions_df <- as.data.frame(t(DF_PTA_fractions))
+  colnames(DF_PTA_fractions_df) <- c("DF_PTA_DVf", "DF_PTA_DVCSF")
+  DF_PTA_fractions_df$MIC <- MIC_values
+  DF_PTA_fractions_df$DF_Dosing <- DF_event_name  # Add dosing regimen
+  DF_PTA_fractions_df$Model <- "Li"  # Add Model column
+  
+  # Rename columns to remove DF_ prefix
+  DF_PTA_fractions_df <- DF_PTA_fractions_df %>%
+    rename(
+      PTA_DVf = DF_PTA_DVf,
+      PTA_DVCSF = DF_PTA_DVCSF,
+      Dosing = DF_Dosing,
+      Model = Model  # Remove prefix from the Model column
+    )
+
+  # Store the PTA results for each event
+  DF_PTA_results[[DF_event_name]] <- DF_PTA_fractions_df
+}
+
+# Combine all PTA results into one data frame
+DF_PTA_combined_results <- bind_rows(DF_PTA_results)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+combined_results_fT <- bind_rows(Luque_PTA_combined_results, Li_PTA_combined_results,DF_PTA_combined_results)
+combined_results_fT$Model <- factor(combined_results_fT$Model, levels = c("Li","Luque","DF"))
 
 
 
@@ -323,7 +514,7 @@ combined_results_fT$Model <- factor(combined_results_fT$Model, levels = c("Li","
 
 
 n_individuals <- 1000
-Luque_model_name <- "Li"  # Add the model name here
+Luque_model_name <- "Luque"  # Add the model name here
 MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
 
 Luque_AUC_PTA_results <- list()  # Store PTA results for AUC/MIC > 10
@@ -455,8 +646,74 @@ Li_AUC_combined_results <- bind_rows(Li_AUC_PTA_results)
 
 
 
-combined_results_AUC <- bind_rows(Luque_AUC_combined_results, Li_AUC_combined_results)
-combined_results_AUC$Model <- factor(combined_results_AUC$Model, levels = c("Li","Luque"))
+
+
+n_individuals <- 1000
+DF_model_name <- "DF"  # Add the model name here
+MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
+
+DF_AUC_PTA_results <- list()  # Store PTA results for AUC/MIC > 10
+
+for (DF_event_name in names(DF_events)) {
+  DF_ev_current <- DF_events[[DF_event_name]]
+  
+  # Run the simulation for the current event
+  DF_out <- DF_mod %>%
+    ev(DF_ev_current) %>%
+    mrgsim(nid = n_individuals, delta = 0.1, end = 96, obsonly = TRUE)
+  
+  # Extract data for time points between 72 and 96 hours
+  DF_out_72_96 <- DF_out %>%
+    as.data.frame() %>%
+    filter(time >= 72 & time <= 96)
+  
+  # Summarize the AUC for AUCP and AUCCSF between 72 and 96 hours
+  DF_AUC_summary <- DF_out_72_96 %>%
+    group_by(ID) %>%
+    summarize(
+      AUCP_72_96 = max(AUCP) - min(AUCP),           # Calculate AUC for plasma as difference between max and min
+      AUCCSF_72_96 = max(AUCCSF) - min(AUCCSF)      # Calculate AUC for CSF as difference between max and min
+    ) %>%
+    mutate(Dosing = factor(DF_event_name),          # Add a column for event as a factor
+           Model = factor(DF_model_name))           # Add a column for model as a factor
+  
+  # Function to calculate PTA for AUC/MIC > 10
+  calc_pta_for_AUC_MIC <- function(data, MIC) {
+    # Calculate the AUC/MIC ratio and determine if it is greater than 10
+    DF_pta_AUCP <- data %>%
+      mutate(AUC_MIC_P = AUCP_72_96 / MIC) %>% 
+      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 10
+    
+    DF_pta_AUCCSF <- data %>%
+      mutate(AUC_MIC_CSF = AUCCSF_72_96 / MIC) %>%
+      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 10
+    
+    return(c(PTA_AUCP = DF_pta_AUCP$PTA_AUCP, PTA_AUCCSF = DF_pta_AUCCSF$PTA_AUCCSF))
+  }
+  
+  # Calculate PTA for each MIC value
+  DF_PTA_AUC <- sapply(MIC_values, function(MIC) {
+    calc_pta_for_AUC_MIC(DF_AUC_summary, MIC)
+  })
+  
+  # Convert to data frame and store results
+  DF_PTA_AUC_df <- as.data.frame(t(DF_PTA_AUC))
+  colnames(DF_PTA_AUC_df) <- c("PTA_AUCP", "PTA_AUCCSF")
+  DF_PTA_AUC_df$MIC <- MIC_values
+  DF_PTA_AUC_df$Dosing <- DF_event_name  # Add dosing regimen
+  DF_PTA_AUC_df$Model <- "DF"  # Add Model column
+  
+  # Store the PTA results for each event
+  DF_AUC_PTA_results[[DF_event_name]] <- DF_PTA_AUC_df
+}
+
+# Combine all PTA results into one data frame
+DF_AUC_combined_results <- bind_rows(DF_AUC_PTA_results)
+
+
+
+combined_results_AUC <- bind_rows(Luque_AUC_combined_results, Li_AUC_combined_results, DF_AUC_combined_results)
+combined_results_AUC$Model <- factor(combined_results_AUC$Model, levels = c("Li","Luque", "DF"))
 
 
 
@@ -552,13 +809,52 @@ Li_combined_results <- bind_rows(Li_results)
 
 
 
+# Define the DF model
+DF_mod <- mrgsolve::mcode("DF_optim", DF, atol=1e-8, rtol=1e-8, maxsteps=5000)
+
+# Define the dosing events for DF (similar to Luque)
+DF_events <- list(
+  `600q12h` = ev(amt = 600, rate = 1200, cmt = 1, ii = 12, addl = 20),
+  `600q8h` = ev(amt = 600, rate = 1200, cmt = 1, ii = 8, addl = 20),
+  `600q6h` = ev(amt = 600, rate = 1200, cmt = 1, ii = 6, addl = 20),
+  `1200q24hCI` = ev(amt = 4800, rate = 50, cmt = 1, ii = 0, addl = 0),
+  `1800q24hCI` = ev(amt = 7200, rate = 75, cmt = 1, ii = 0, addl = 0),
+  `2400q24hCI` = ev(amt = 9600, rate = 100, cmt = 1, ii = 0, addl = 0)
+)
+
+n_individuals <- 1000
+DF_results <- list()
+DF_model_name <- "DF"  # Add the model name here
+
+for (DF_event_name in names(DF_events)) {
+  DF_ev_current <- DF_events[[DF_event_name]]
+  
+  # Run the simulation for the current event
+  DF_out <- DF_mod %>%
+    ev(DF_ev_current) %>%
+    mrgsim(nid = n_individuals, delta = 0.1, end = 96, obsonly = TRUE)
+  
+  # Add Dosing Regimen and Model Name to DF_out
+  DF_out_data <- DF_out@data %>%
+    mutate(Dosing = DF_event_name, Model = DF_model_name)
+  
+  # Store the results
+  DF_results[[DF_event_name]] <- DF_out_data
+}
+
+# Combine all results from the DF model into a single data frame
+DF_combined_results <- bind_rows(DF_results)
+
+
+
+
 
 
 
 
 
 # Combine Li and Luque results into a single data frame
-combined_results_sim <- bind_rows(Li_combined_results, Luque_combined_results)
+combined_results_sim <- bind_rows(Li_combined_results, Luque_combined_results,DF_combined_results)
 
 
 # Filter data where time is between 72 and 96 hours, then group and summarize
@@ -661,31 +957,84 @@ summary_data_Plasma <- combined_results_sim %>%
 
 summary_data_Plasma$Dosing <- factor(summary_data_Plasma$Dosing, levels = c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI"))
 
-SimDosing_Plasma <- ggplot(summary_data_Plasma, aes(x = time, y = median_DVf, color = Model)) + 
+
+
+jco_colors <- pal_jco()(3)
+
+# For demonstration, imagine your summary_data_Plasma has "Luque", "Li", "DF" as Model
+# We'll create one plot per model.
+
+#-----------------------------
+# 1) Luque 
+#-----------------------------
+SimDosing_Plasma_Luque <- summary_data_Plasma %>%
+  filter(Model == "Luque") %>%
+  ggplot(aes(x = time, y = median_DVf)) +
   
-  # Ribbon for 5th to 95th percentile (more transparent for outer bounds)
-  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th, fill = Model), alpha = 0.2) + 
+  # Ribbon for 5th to 95th percentile
+  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th), alpha = 0.2, fill = jco_colors[1]) +
   
   # Ribbon for 25th to 75th percentile (IQR)
-  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR, fill = Model), alpha = 0.4) +
+  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[1]) +
   
-  # Line for median DVf
-  geom_line(size = 1.5) + 
+  # Median line
+  geom_line(size = 1.5, color = jco_colors[1]) +
   
   facet_wrap(~ Dosing, scales = "free_x") +
-  
   xlab("Time (hours)") + 
   ylab("LZD (mg/L)") +
+  ggtitle("LZD PK Profile in Plasma - Luque") +
+  my_theme
+
+#-----------------------------
+# 2) Li 
+#-----------------------------
+SimDosing_Plasma_Li <- summary_data_Plasma %>%
+  filter(Model == "Li") %>%
+  ggplot(aes(x = time, y = median_DVf)) +
   
-  scale_color_jco() +  # Color scheme for lines
-  scale_fill_jco() +    # Fill color scheme for ribbons
+  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th), alpha = 0.2, fill = jco_colors[2]) +
+  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[2]) +
+  geom_line(size = 1.5, color = jco_colors[2]) +
   
-  ggtitle("LZD PK profile in plasma") + 
-  my_theme + 
-    theme(
-    strip.background = element_blank(),   # Clean up facet strip background
-    strip.placement = "outside"           # Position facet strips outside the plot
-  )
+  facet_wrap(~ Dosing, scales = "free_x") +
+  xlab("Time (hours)") + 
+  ylab("LZD (mg/L)") +
+  ggtitle("LZD PK Profile in Plasma - Li") +
+  my_theme
+
+#-----------------------------
+# 3) DF
+#-----------------------------
+SimDosing_Plasma_DF <- summary_data_Plasma %>%
+  filter(Model == "DF") %>%
+  ggplot(aes(x = time, y = median_DVf)) +
+  
+  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th), alpha = 0.2, fill = jco_colors[3]) +
+  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[3]) +
+  geom_line(size = 1.5, color = jco_colors[3]) +
+  
+  facet_wrap(~ Dosing, scales = "free_x") +
+  xlab("Time (hours)") + 
+  ylab("LZD (mg/L)") +
+  ggtitle("LZD PK Profile in Plasma - DF") +
+  my_theme
+
+# Finally, arrange the three separate plots (one per model)
+combined_plot_Sim_Plasma <- ggarrange(
+  SimDosing_Plasma_Luque,
+  SimDosing_Plasma_Li,
+  SimDosing_Plasma_DF,
+  ncol = 3,       # or 3, if you want them side by side
+  nrow = 1, 
+  labels = c("A", "B", "C"),  
+  common.legend = FALSE  # Each is its own color; you can set TRUE if you do want a combined legend
+)
+
+# Save or print as needed
+print(combined_plot_Sim)
+
+
 
 
 
@@ -709,30 +1058,68 @@ summary_data_CSF <- combined_results_sim %>%
 
 summary_data_CSF$Dosing <- factor(summary_data_CSF$Dosing, levels = c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI"))
 
-SimDosing_CSF <- ggplot(summary_data_CSF, aes(x = time, y = median_DVCSF, color = Model)) + 
+SimDosing_CSF_Luque <- summary_data_CSF %>%
+  filter(Model == "Luque") %>%
+  ggplot(aes(x = time, y = median_DVCSF)) +
   
-  # Ribbon for 5th to 95th percentile (more transparent for outer bounds)
-  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th, fill = Model), alpha = 0.2) + 
+  # 5th to 95th percentile
+  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th), alpha = 0.2, fill = jco_colors[1]) +
   
-  # Ribbon for 25th to 75th percentile (IQR)
-  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR, fill = Model), alpha = 0.4) +
+  # 25th to 75th percentile (IQR)
+  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[1]) +
   
-  # Line for median DVf
-  geom_line(size = 1.5) + 
+  # Median line
+  geom_line(size = 1.5, color = jco_colors[1]) +
   
-  facet_wrap(~ Dosing, scales = "free_x")  +
+  facet_wrap(~ Dosing, scales = "free_x") +
   xlab("Time (hours)") + 
-  ylab("LZD (mg/L))") +
+  ylab("LZD (mg/L)") +
+  ggtitle("CSF - Luque Model") +
+  my_theme
+
+#--- 2) Filter for Li and plot ---#
+SimDosing_CSF_Li <- summary_data_CSF %>%
+  filter(Model == "Li") %>%
+  ggplot(aes(x = time, y = median_DVCSF)) +
   
-  scale_color_jco() +  # Color scheme for lines
-  scale_fill_jco() +    # Fill color scheme for ribbons
+  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th), alpha = 0.2, fill = jco_colors[2]) +
+  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[2]) +
+  geom_line(size = 1.5, color = jco_colors[2]) +
   
-  ggtitle("LZD PK profile in CSF") + 
-   my_theme + 
-    theme(
-    strip.background = element_blank(),   # Clean up facet strip background
-    strip.placement = "outside"           # Position facet strips outside the plot
-  )
+  facet_wrap(~ Dosing, scales = "free_x") +
+  xlab("Time (hours)") + 
+  ylab("LZD (mg/L)") +
+  ggtitle("CSF - Li Model") +
+  my_theme
+
+#--- 3) Filter for DF and plot ---#
+SimDosing_CSF_DF <- summary_data_CSF %>%
+  filter(Model == "DF") %>%
+  ggplot(aes(x = time, y = median_DVCSF)) +
+  
+  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th), alpha = 0.2, fill = jco_colors[3]) +
+  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[3]) +
+  geom_line(size = 1.5, color = jco_colors[3]) +
+  
+  facet_wrap(~ Dosing, scales = "free_x") +
+  xlab("Time (hours)") + 
+  ylab("LZD (mg/L)") +
+  ggtitle("CSF - DF Model") +
+  my_theme
+
+#--- Arrange the three plots vertically (or however you prefer) ---#
+combined_plot_Sim_CSF <- ggarrange(
+  SimDosing_CSF_Luque,
+  SimDosing_CSF_Li,
+  SimDosing_CSF_DF,
+  ncol = 3,        # or 3 if you prefer them side-by-side
+  nrow = 1,
+  labels = c("A", "B", "C"),  
+  common.legend = FALSE  # Each is its own color set; set to TRUE only if you want to unify them
+)
+
+# Display or save the plot
+print(combined_plot_Sim_CSF)
 
 
 
@@ -740,8 +1127,7 @@ SimDosing_CSF <- ggplot(summary_data_CSF, aes(x = time, y = median_DVCSF, color 
 
 
 
-
-combined_plot_Sim <- ggarrange(SimDosing_Plasma, SimDosing_CSF, 
+combined_plot_Sim <- ggarrange(combined_plot_Sim_Plasma, combined_plot_Sim_CSF, 
                            ncol = 1, nrow = 2,  # Arrange plots vertically
                            labels = c("A", "B"),  # Add labels to the plots (optional)
                            common.legend = TRUE,  # Use a common legend for both plots
@@ -749,7 +1135,7 @@ combined_plot_Sim <- ggarrange(SimDosing_Plasma, SimDosing_CSF,
 
 
 
-png("D:/MOBILITE/Charles B/VF/Sim_Plot.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/duflo/OneDrive/Bureau/LZD/Sim_Plot.png", width = 24, height = 12, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_Sim)
