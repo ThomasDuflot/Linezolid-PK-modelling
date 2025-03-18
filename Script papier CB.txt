@@ -458,7 +458,7 @@ calc_pta_for_MIC <- function(data, MIC) {
   colnames(DF_PTA_fractions_df) <- c("DF_PTA_DVf", "DF_PTA_DVCSF")
   DF_PTA_fractions_df$MIC <- MIC_values
   DF_PTA_fractions_df$DF_Dosing <- DF_event_name  # Add dosing regimen
-  DF_PTA_fractions_df$Model <- "Li"  # Add Model column
+  DF_PTA_fractions_df$Model <- "DF"  # Add Model column
   
   # Rename columns to remove DF_ prefix
   DF_PTA_fractions_df <- DF_PTA_fractions_df %>%
@@ -1334,7 +1334,7 @@ combined_plot_PTA <- ggarrange(PTA_AUC_Plasma, PTA_AUC_CSF,
 
 
 
-png("D:/MOBILITE/Charles B/VF/PTA_AUC_Plot_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/duflo/OneDrive/Bureau/LZD/PTA_AUC_Plot_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_PTA)
@@ -1412,7 +1412,7 @@ combined_plot_PTA_fT <- ggarrange(PTA_fT_Plasma, PTA_fT_CSF,
 
 
 
-png("D:/MOBILITE/Charles B/VF/PTA_fT_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/duflo/OneDrive/Bureau/LZD/PTA_fT_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_PTA_fT)
@@ -1529,10 +1529,26 @@ labels <- paste0(c("Staphylococcus spp: ", "Enterococcus spp: ",
 subtitle_text <- paste(labels[1], labels[2], "\n", labels[3], labels[4], "\n", labels[5])
 
 
-MIC_Distrib<-ggplot(combined_data, aes(x = MIC_value, y = Percentage, fill = Species)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8), 
-           color = ifelse(combined_data$Species == "Total Distribution", "black", NA),  # Add black border for Total Distribution
-           size = ifelse(combined_data$Species == "Total Distribution", 1, 0)) +  # Set border size
+MIC_Distrib <- ggplot() +
+  # 1) Big transparent bars for Total Distribution
+  geom_bar(
+    data = subset(combined_data, Species == "Total Distribution"),
+    aes(x = MIC_value, y = Percentage),
+    stat = "identity",
+    position = "identity",  # so it doesn't dodge
+    fill = "black",
+    alpha = 0.2  # or 0.3, 0.4, etc. pick your favorite transparency
+  ) +
+  
+  # 2) Individual species bars on top
+  geom_bar(
+    data = subset(combined_data, Species != "Total Distribution"),
+    aes(x = MIC_value, y = Percentage, fill = Species),
+    stat = "identity",
+    position = position_dodge(width = 0.8)  # side-by-side species
+  ) +
+  
+  # 3) Labels, scales, etc.
   labs(
     title = "Distribution of MIC values and counts for each species", 
     subtitle = subtitle_text,
@@ -1549,9 +1565,12 @@ MIC_Distrib<-ggplot(combined_data, aes(x = MIC_value, y = Percentage, fill = Spe
     legend.text = element_text(size = 16, color = "black")
   )
 
+print(MIC_Distrib)
 
 
-png("D:/MOBILITE/Charles B/VF/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+
+
+png("C:/Users/duflo/OneDrive/Bureau/LZD/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 print(MIC_Distrib)
 dev.off()
 
@@ -1695,3 +1714,106 @@ doc_csf <- read_docx() %>%
   body_add_flextable(value = auc_flextable_csf)
 
 print(doc_csf, target = "pta_auc_csf.docx")
+
+
+
+
+
+
+
+
+
+
+
+Plasma_AUC <- ggplot(combined_results_AUC, aes(x = Dosing, y = AUCP_72_96, fill = Model)) +
+
+  geom_violin(position = position_dodge(width = 0.75), alpha = 0.3, color = "black", linewidth = 1.5) +  # Violin plot with darker borders
+
+  geom_boxplot(width = 0.2, position = position_dodge(width = 0.75), alpha = 0.7, outlier.shape = NA, color = "black", linewidth = 1.2) +  # Thicker boxplot borders
+
+  geom_point(aes(color = Model), position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75), alpha = 0.01, size = 1.5) +  # More transparent points
+
+  labs(
+
+    title = "Plasma AUC according to Dosing Regimen and Model",
+
+    x = "Dosing Regimen",
+
+    y = "AUC at steady state (mg/L.h)"
+
+  ) +
+
+  scale_fill_jco() +  # Apply JCO theme for fill colors
+
+  scale_color_jco() +  # Apply JCO theme for point colors
+
+  my_theme  # Apply the custom theme
+
+
+
+
+
+
+
+
+
+CSF_AUC <- ggplot(combined_results_AUC, aes(x = Dosing, y = AUCCSF_72_96, fill = Model)) +
+
+  geom_violin(position = position_dodge(width = 0.75), alpha = 0.3, color = "black", linewidth = 1.5) +  # Violin plot with darker borders
+
+  geom_boxplot(width = 0.2, position = position_dodge(width = 0.75), alpha = 0.7, outlier.shape = NA, color = "black", linewidth = 1.2) +  # Thicker boxplot borders
+
+  geom_point(aes(color = Model), position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75), alpha = 0.01, size = 1.5) +  # More transparent points
+
+  labs(
+
+    title = "CSF AUC according to Dosing Regimen and Model",
+
+    x = "Dosing Regimen",
+
+    y = "AUC at steady state (mg/L.h)"
+
+  ) +
+
+  scale_fill_jco() +  # Apply JCO theme for fill colors
+
+  scale_color_jco() +  # Apply JCO theme for point colors
+
+  my_theme  # Apply the custom theme
+
+
+
+
+
+combined_plot_AUC <- ggarrange(Plasma_AUC, CSF_AUC, 
+
+                           ncol = 1, nrow = 2,  # Arrange plots vertically
+
+                           labels = c("A", "B"),  # Add labels to the plots (optional)
+
+                           common.legend = TRUE,  # Use a common legend for both plots
+
+                           legend = "top")  # Position the legend at the top
+
+
+
+
+
+png("D:/MOBILITE/Charles B/VF/AUC_Plot.png", width = 16, height = 9, units = 'in', res = 900)  # Specify width, height, and resolution
+
+
+
+# Print the plot to the device
+
+print(combined_plot_AUC)
+
+
+
+# Close the device
+
+dev.off()
+
+
+
+
+
