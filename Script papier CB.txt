@@ -8,7 +8,7 @@ library(officer)
 library(tidyr)
 library(reshape2)
 
-setwd("D:/MOBILITE/Charles B/VF/")
+setwd("C:/Users/duflo/OneDrive/Bureau/LZD")
 
 my_theme <- theme_minimal(base_size = 16) +
   theme(
@@ -66,8 +66,8 @@ double CL = TVCL *exp(ETA(1))   ;
 double VC = TVVC *exp(ETA(2))  ;
 double VP = TVVP *exp(ETA(3))   ;
 double Q = TVQ * exp(ETA(4)) ;
-double VCSF = TVVCSF ;
-double QCSF = TVQCSF ;
+double VCSF = TVVCSF * exp(ETA(5)) ;
+double QCSF = TVQCSF * exp(ETA(6)) ;
 double K10 = CL/VC;
 double K12 = Q/VC;
 double K21 = Q/VP;
@@ -185,14 +185,14 @@ PCT : 0.87 : Effect of Proton Pump Inhibitor on KA
 PCT_Q : 0.25 : Effect of PCT on PC
 
 $OMEGA @block
-0.0098 // CL
-0 0.0031 // VC
+0.202 // CL
+0 0 // VC
 0 0 0 // VCSF
-0 0 0 0.0244 // QCSF
-0 0 0 0 0.0036 // PC
-0 0 0 0 0 0.0000018 // CLCSF
-0 0 0 0 0 0 0.1002 // CrCl_CL
-0 0 0 0 0 0 0 0.125 // PCT_Q
+0 0 0 0 // QCSF
+0 0 0 0 0.0422 // PC
+0 0 0 0 0 0 // CLCSF
+0 0 0 0 0 0 0 // CrCl_CL
+0 0 0 0 0 0 0 0 // PCT_Q
 
 
 $SIGMA 
@@ -213,10 +213,10 @@ double DVCSF = (CSF / VCSF);
 double DVf = DV*0.69;
 
 $MAIN
-double CL = TVCL *exp(ETA(1))* pow((CrCl/97.87),(CrCl_CL*exp(ETA(8))))   ;
+double CL = TVCL *exp(ETA(1))* pow((CrCl/97.87),(CrCl_CL*exp(ETA(7))))   ;
 double VC = TVVC *exp(ETA(2))  ;
-double VCSF = TVVCSF ;
-double QCSF = TVQCSF *exp(ETA(4))* pow((PCT/0.86),(PCT_Q*exp(ETA(9)))) ;
+double VCSF = TVVCSF * exp(ETA(3)) ;
+double QCSF = TVQCSF *exp(ETA(4))* pow((PCT/0.86),(PCT_Q*exp(ETA(8)))) ;
 double PC = TVPC*exp(ETA(5));
 double CLCSF = TVCLCSF * exp(ETA(6)) ;
 double K10 = CL/VC;
@@ -338,22 +338,23 @@ $PARAM @annotated
 TVCL : 8.38  : 1  Clearance (L.h-1)
 TVVC : 36.4  : 2  Central volume (L)
 TVVCSF : 0.15 : CSF Volume (L)
-TVVEVD ! 0.15 : CSF samples collected via the EVD
 TVQCSFin : 0.04 : Intercompartimental clearance CSF (L.h-1)
 TVQCSFout : 0.0367 : Intercompartimental clearance CSF (L.h-1)
 TVCLEVD : 0.0102 : Clearance EVD
 
 $PARAM @annotated @covariates
 
-WT : 74 : Creatinine clearance (mL/min/1.73m²)
+WT : 70 : Creatinine clearance (mL/min/1.73m²)
 WT_VC : 0.0115 : Coefficient of the linear relationship between V1pop and patient weight
 
 
 $OMEGA @block
-0.052 // VC
-0 0.187 // CL
-0 0 0.02225 // QCSFin
-0 0 0 0 0.209765 // CLEVD
+0.187 // CL
+0 0.052 // VC
+0 0 0 // VCSF
+0 0 0 0.02225 // QCSFin
+0 0 0 0 0 // QCSFout
+0 0 0 0 0 0.209765 // CLEVD
 
 
 $SIGMA 
@@ -371,24 +372,25 @@ AUCCSF : AUC in CSF (mg/L.h)
 $TABLE
 double DV  = (CENTRAL / VC) ;
 double DVCSF = (CSF / VCSF);
-double DVf = DV*0.69;
+double DVf = 0.69*DV;
 
 $MAIN
 double CL = TVCL *exp(ETA(1))   ;
 double VC = TVVC *(1+0.0115*(WT-74)*exp(ETA(2)))  ;
-double VCSF = TVVCSF ;
+double VCSF = TVVCSF * exp(ETA(3)) ;
 double QCSFin = TVQCSFin *exp(ETA(4)) ;
-double QCSFout = TVQCSFout * exp(ETA(5));
+double QCSFout = TVQCSFout * exp(ETA(5)) ;
+double CLEVD = TVCLEVD*exp(ETA(6));
 double K10 = CL/VC;
 double K12 = QCSFin/VC;
 double K21 = QCSFout/VCSF;
-
+double K23 = CLEVD/VCSF;
 
 
 $ODE
 
-dxdt_CENTRAL      = -K10* CENTRAL - K12*CENTRAL + K21*CSF  ;
-dxdt_CSF    = K12*CENTRAL - K21*CSF ;
+dxdt_CENTRAL      = -K10* CENTRAL - 0.69*K12*CENTRAL + K21*CSF  ;
+dxdt_CSF    = 0.69*K12*CENTRAL - K21*CSF - K23*CSF ;
 dxdt_AUCP = DVf;
 dxdt_AUCCSF = DVCSF;
 
@@ -397,6 +399,10 @@ $CAPTURE DV DVf DVCSF'
 
 # Define the DF model
 DF_mod <- mrgsolve::mcode("DF_optim", DF, atol=1e-8, rtol=1e-8, maxsteps=5000)
+
+
+
+
 
 # Define the dosing events with DF_ prefix
 DF_events <- list(
@@ -980,11 +986,15 @@ SimDosing_Plasma_Luque <- summary_data_Plasma %>%
   # Median line
   geom_line(size = 1.5, color = jco_colors[1]) +
   
-  facet_wrap(~ Dosing, scales = "free_x") +
+  facet_wrap(~ Dosing, scales = "free") +
   xlab("Time (hours)") + 
   ylab("LZD (mg/L)") +
   ggtitle("LZD PK Profile in Plasma - Luque") +
-  my_theme
+  my_theme + theme(
+    panel.spacing.x = unit(2, "lines"),  # Increase horizontal gap
+    panel.spacing.y = unit(1, "lines")   # Use 1 (or whatever) for vertical gap
+  )
+
 
 #-----------------------------
 # 2) Li 
@@ -997,11 +1007,15 @@ SimDosing_Plasma_Li <- summary_data_Plasma %>%
   geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[2]) +
   geom_line(size = 1.5, color = jco_colors[2]) +
   
-  facet_wrap(~ Dosing, scales = "free_x") +
+  facet_wrap(~ Dosing, scales = "free") +
   xlab("Time (hours)") + 
   ylab("LZD (mg/L)") +
   ggtitle("LZD PK Profile in Plasma - Li") +
-  my_theme
+  my_theme + theme(
+    panel.spacing.x = unit(2, "lines"),  # Increase horizontal gap
+    panel.spacing.y = unit(1, "lines")   # Use 1 (or whatever) for vertical gap
+  )
+
 
 #-----------------------------
 # 3) DF
@@ -1014,11 +1028,15 @@ SimDosing_Plasma_DF <- summary_data_Plasma %>%
   geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[3]) +
   geom_line(size = 1.5, color = jco_colors[3]) +
   
-  facet_wrap(~ Dosing, scales = "free_x") +
+  facet_wrap(~ Dosing, scales = "free") +
   xlab("Time (hours)") + 
   ylab("LZD (mg/L)") +
   ggtitle("LZD PK Profile in Plasma - DF") +
-  my_theme
+  my_theme + theme(
+    panel.spacing.x = unit(2, "lines"),  # Increase horizontal gap
+    panel.spacing.y = unit(1, "lines")   # Use 1 (or whatever) for vertical gap
+  )
+
 
 # Finally, arrange the three separate plots (one per model)
 combined_plot_Sim_Plasma <- ggarrange(
@@ -1027,12 +1045,12 @@ combined_plot_Sim_Plasma <- ggarrange(
   SimDosing_Plasma_DF,
   ncol = 3,       # or 3, if you want them side by side
   nrow = 1, 
-  labels = c("A", "B", "C"),  
+  labels = c("", "", ""),  
   common.legend = FALSE  # Each is its own color; you can set TRUE if you do want a combined legend
 )
 
 # Save or print as needed
-print(combined_plot_Sim)
+print(combined_plot_Sim_Plasma)
 
 
 
@@ -1071,11 +1089,15 @@ SimDosing_CSF_Luque <- summary_data_CSF %>%
   # Median line
   geom_line(size = 1.5, color = jco_colors[1]) +
   
-  facet_wrap(~ Dosing, scales = "free_x") +
+  facet_wrap(~ Dosing, scales = "free") +
   xlab("Time (hours)") + 
   ylab("LZD (mg/L)") +
   ggtitle("CSF - Luque Model") +
-  my_theme
+  my_theme + theme(
+    panel.spacing.x = unit(2, "lines"),  # Increase horizontal gap
+    panel.spacing.y = unit(1, "lines")   # Use 1 (or whatever) for vertical gap
+  )
+
 
 #--- 2) Filter for Li and plot ---#
 SimDosing_CSF_Li <- summary_data_CSF %>%
@@ -1086,11 +1108,15 @@ SimDosing_CSF_Li <- summary_data_CSF %>%
   geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[2]) +
   geom_line(size = 1.5, color = jco_colors[2]) +
   
-  facet_wrap(~ Dosing, scales = "free_x") +
+  facet_wrap(~ Dosing, scales = "free") +
   xlab("Time (hours)") + 
   ylab("LZD (mg/L)") +
   ggtitle("CSF - Li Model") +
-  my_theme
+  my_theme + theme(
+    panel.spacing.x = unit(2, "lines"),  # Increase horizontal gap
+    panel.spacing.y = unit(1, "lines")   # Use 1 (or whatever) for vertical gap
+  )
+
 
 #--- 3) Filter for DF and plot ---#
 SimDosing_CSF_DF <- summary_data_CSF %>%
@@ -1101,11 +1127,15 @@ SimDosing_CSF_DF <- summary_data_CSF %>%
   geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR), alpha = 0.4, fill = jco_colors[3]) +
   geom_line(size = 1.5, color = jco_colors[3]) +
   
-  facet_wrap(~ Dosing, scales = "free_x") +
+  facet_wrap(~ Dosing, scales = "free") +
   xlab("Time (hours)") + 
   ylab("LZD (mg/L)") +
   ggtitle("CSF - DF Model") +
-  my_theme
+  my_theme + theme(
+    panel.spacing.x = unit(2, "lines"),  # Increase horizontal gap
+    panel.spacing.y = unit(1, "lines")   # Use 1 (or whatever) for vertical gap
+  )
+
 
 #--- Arrange the three plots vertically (or however you prefer) ---#
 combined_plot_Sim_CSF <- ggarrange(
@@ -1114,7 +1144,7 @@ combined_plot_Sim_CSF <- ggarrange(
   SimDosing_CSF_DF,
   ncol = 3,        # or 3 if you prefer them side-by-side
   nrow = 1,
-  labels = c("A", "B", "C"),  
+  labels = c("", "", ""),  
   common.legend = FALSE  # Each is its own color set; set to TRUE only if you want to unify them
 )
 
@@ -1125,14 +1155,23 @@ print(combined_plot_Sim_CSF)
 
 
 
+empty_plot <- ggplot() + theme_void()
 
+combined_plot_Sim <- ggarrange(
+  # Put your two main plots in one column
+  ggarrange(combined_plot_Sim_Plasma, 
+            combined_plot_Sim_CSF,
+            ncol = 1, nrow = 2,
+            labels = c("A","B"),
+            common.legend = TRUE,
+            legend = "top"),
+  # Next, the empty plot as a narrow 2nd column
+  empty_plot,
+  ncol = 2,
+  widths = c(1, 0.01)   # 5% width for the empty column
+)
 
-combined_plot_Sim <- ggarrange(combined_plot_Sim_Plasma, combined_plot_Sim_CSF, 
-                           ncol = 1, nrow = 2,  # Arrange plots vertically
-                           labels = c("A", "B"),  # Add labels to the plots (optional)
-                           common.legend = TRUE,  # Use a common legend for both plots
-                           legend = "top")  # Position the legend at the top
-
+print(combined_plot_Sim)
 
 
 png("C:/Users/duflo/OneDrive/Bureau/LZD/Sim_Plot.png", width = 24, height = 12, units = 'in', res = 900)  # Specify width, height, and resolution
@@ -1142,6 +1181,8 @@ print(combined_plot_Sim)
 
 # Close the device
 dev.off()
+
+
 
 
 
