@@ -26,7 +26,7 @@ $PROB
 $PARAM @annotated
 TVCL : 16.6  : 1  Clearance (L.h-1)
 TVVC : 43.2  : 2  Central volume (L)
-TVVP : 47 : 3 Peripheral volume (L)
+TVVP : 58 : 3 Peripheral volume (L)
 TVQ : 3.1 : Intercompartimental clearance peripheral (L.h-1)
 TVVCSF : 0.11 : CSF Volume (L)
 TVQCSF : 0.05 : Intercompartimental clearance CSF (L.h-1)
@@ -175,13 +175,13 @@ TVVC : 52  : 2  Central volume (L)
 TVVCSF : 0.11 : CSF Volume (L)
 TVQCSF : 0.02 : Intercompartimental clearance CSF (L.h-1)
 TVPC : 0.72 : Transfer Multiplier
-TVCLCSF : 0.00833 : CSF Drainage Volume (L.h-1)
+TVCLCSF : 0.008333 : CSF Drainage Volume (L.h-1)
 
 $PARAM @annotated @covariates
 
-CrCl : 90 : Creatinine clearance (mL/min/1.73m²)
-CrCl_CL : -0.8 : Creatinine Clearance on CL
-PCT : 0.87 : Effect of Proton Pump Inhibitor on KA
+CrCl : 98.53 : Creatinine clearance (mL/min/1.73m²)
+CrCl_CL : 0.87 : Effect of Creatinine Clearance on CL
+PCT : 0.14 : PCT
 PCT_Q : 0.25 : Effect of PCT on PC
 
 $OMEGA @block
@@ -190,7 +190,7 @@ $OMEGA @block
 0 0 0 // VCSF
 0 0 0 0 // QCSF
 0 0 0 0 0.0422 // PC
-0 0 0 0 0 0 // CLCSF
+0 0 0 0 0 0.024 // CLCSF
 0 0 0 0 0 0 0 // CrCl_CL
 0 0 0 0 0 0 0 0 // PCT_Q
 
@@ -213,10 +213,10 @@ double DVCSF = (CSF / VCSF);
 double DVf = DV*0.69;
 
 $MAIN
-double CL = TVCL *exp(ETA(1))* pow((CrCl/97.87),(CrCl_CL*exp(ETA(7))))   ;
+double CL = TVCL *exp(ETA(1))* pow((CrCl/98.53),(CrCl_CL*exp(ETA(7))))   ;
 double VC = TVVC *exp(ETA(2))  ;
 double VCSF = TVVCSF * exp(ETA(3)) ;
-double QCSF = TVQCSF *exp(ETA(4))* pow((PCT/0.86),(PCT_Q*exp(ETA(8)))) ;
+double QCSF = TVQCSF *exp(ETA(4))* pow((PCT/0.14),(PCT_Q*exp(ETA(8)))) ;
 double PC = TVPC*exp(ETA(5));
 double CLCSF = TVCLCSF * exp(ETA(6)) ;
 double K10 = CL/VC;
@@ -874,7 +874,8 @@ min_values <- combined_results_sim %>%
     AUCCSF_72_96 = max(AUCCSF) - min(AUCCSF)
   ) %>%
   # Reorder Model as "Li", "Luque", "DF"
-  mutate(Model = factor(Model, levels = c("Li", "Luque", "DF")))
+  mutate(Dosing = factor(Dosing,levels = c("600q12h", "600q8h", "600q6h","1200q24hCI", "1800q24hCI", "2400q24hCI")),
+Model = factor(Model, levels = c("Li", "Luque", "DF")))
 
 
 min_values <- min_values %>%
@@ -971,10 +972,10 @@ summary_stats <- summary_stats %>%
   arrange(Dosing, Model) %>%
   # Rename columns
   rename(
-    "Plasma AUC (mg/L.h)" = AUCP_Median,
-    "CSF AUC (mg/L.h)"    = AUCCSF_Median,
-    "Plasma Cmin (mg/L)" = DVf_Median,
-    "CSF Cmin (mg/L)"     = DVCSF_Median
+    "Plasma AUC (mg/L.h)" = Median_AUCP,
+    "CSF AUC (mg/L.h)"    = Median_AUCCSF,
+    "Plasma Cmin (mg/L)" = Median_DVf,
+    "CSF Cmin (mg/L)"     = Median_DVCSF
   ) %>%
   # Keep only the specified columns in final output
   select(Dosing, Model, 
