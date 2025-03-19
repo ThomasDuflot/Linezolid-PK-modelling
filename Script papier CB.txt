@@ -85,8 +85,7 @@ dxdt_AUCCSF = DVCSF;
 
 $CAPTURE DV DVf DVCSF '
 
-library(mrgsolve)
-library(dplyr)
+
 
 # Define the Luque model
 Luque_mod <- mrgsolve::mcode("Luque_optim", Luque, atol=1e-8, rtol=1e-8, maxsteps=5000)
@@ -1675,141 +1674,221 @@ dev.off()
 
 
 
+library(dplyr)
+library(tidyr)
+library(flextable)
+library(officer)
 
-# Reshape the data for creating the desired table
+##---------------------------------------------------------------
+## Ensure numeric values before reshaping
+##---------------------------------------------------------------
+
+# Convert necessary columns to numeric explicitly
 combined_results_fT <- combined_results_fT %>%
-  mutate(Dosing = factor(Dosing, levels = c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI"))) %>%
-  arrange(Dosing, Model)
+  mutate(PTA_DVf = as.numeric(PTA_DVf),
+         PTA_DVCSF = as.numeric(PTA_DVCSF))
 
-# Create separate tables for Plasma and CSF
-combined_results_fT_wide_plasma <- combined_results_fT %>%
-  pivot_wider(
-    id_cols = c(Dosing, Model),
-    names_from = MIC,
-    values_from = PTA_DVf,
-    names_sep = "_"
-  )
-
-combined_results_fT_wide_csf <- combined_results_fT %>%
-  pivot_wider(
-    id_cols = c(Dosing, Model),
-    names_from = MIC,
-    values_from = PTA_DVCSF,
-    names_sep = "_"
-  )
-
-# Update column names for better readability
-names(combined_results_fT_wide_plasma)[-c(1, 2)] <- paste0("MIC = ", names(combined_results_fT_wide_plasma)[-c(1, 2)])
-names(combined_results_fT_wide_plasma)[1:2] <- c("Dosing", "Model")
-names(combined_results_fT_wide_plasma) <- gsub("_", " - MIC = ", names(combined_results_fT_wide_plasma))
-
-names(combined_results_fT_wide_csf)[-c(1, 2)] <- paste0("MIC = ", names(combined_results_fT_wide_csf)[-c(1, 2)])
-names(combined_results_fT_wide_csf)[1:2] <- c("Dosing", "Model")
-names(combined_results_fT_wide_csf) <- gsub("_", " - MIC = ", names(combined_results_fT_wide_csf))
-
-# Create flextables
-pta_flextable_plasma <- flextable(combined_results_fT_wide_plasma) %>%
-  set_header_labels(
-    Dosing = "Dosing Regimen",
-    Model = "Model"
-  ) %>%
-  theme_vanilla() %>%                  # Apply a clean vanilla theme
-  bold(part = "header") %>%            # Make header bold
-  align(align = "center", part = "header") %>%  # Center-align header
-  align(align = "right", part = "body") %>%     # Right-align numeric data
-  autofit() %>%                        # Adjust column widths to fit content
-  fontsize(size = 10, part = "all")     # Set font size
-
-pta_flextable_csf <- flextable(combined_results_fT_wide_csf) %>%
-  set_header_labels(
-    Dosing = "Dosing Regimen",
-    Model = "Model"
-  ) %>%
-  theme_box() %>%
-  autofit()
-
-# Create Word documents and add the formatted tables
-doc_plasma <- read_docx() %>%
-    body_add_par(value = "PTA Plasma fT", style = "heading 1") %>%
-  body_add_flextable(value = pta_flextable_plasma)
-
-print(doc_plasma, target = "pta_plasma_dT.docx")
-
-doc_csf <- read_docx() %>%
-    body_add_par(value = "PTA CSF fT", style = "heading 1") %>%
-  body_add_flextable(value = pta_flextable_csf)
-
-print(doc_csf, target = "pta_csf_fT.docx")
-
-
-
-
-
-
-# Reshape the data for creating the desired table
 combined_PTA_AUC_results <- combined_PTA_AUC_results %>%
-  mutate(Dosing = factor(Dosing, levels = c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI"))) %>%
-  arrange(Dosing, Model)
+  mutate(PTA_AUCP = as.numeric(PTA_AUCP),
+         PTA_AUCCSF = as.numeric(PTA_AUCCSF))
 
-# Create separate tables for Plasma and CSF
-combined_PTA_AUC_wide_plasma <- combined_PTA_AUC_results %>%
+##---------------------------------------------------------------
+## Merge fT and AUC datasets for Plasma and CSF
+##---------------------------------------------------------------
+
+df_fT_plasma <- combined_results_fT %>%
+  transmute(Dosing, Model, MIC, Target = "fT > MIC", Value = as.numeric(PTA_DVf), Matrix = "Plasma")
+
+df_fT_csf <- combined_results_fT %>%
+  transmute(Dosing, Model, MIC, Target = "fT > MIC", Value = as.numeric(PTA_DVCSF), Matrix = "CSF")
+
+df_AUC_plasma <- combined_PTA_AUC_results %>%
+  transmute(Dosing, Model, MIC, Target = "AUC/MIC > 100", Value = as.numeric(PTA_AUCP), Matrix = "Plasma")
+
+df_AUC_csf <- combined_PTA_AUC_results %>%
+  transmute(Dosing, Model, MIC, Target = "AUC/MIC > 100", Value = as.numeric(PTA_AUCCSF), Matrix = "CSF")
+
+# Combine datasets
+df_plasma <- bind_rows(df_fT_plasma, df_AUC_plasma)
+df_csf <- bind_rows(df_fT_csf, df_AUC_csf)
+
+##---------------------------------------------------------------
+## Factorize Dosing and Model correctly
+##---------------------------------------------------------------
+
+dose_levels  <- c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI")
+model_levels <- c("Li", "Luque", "DF")
+
+df_plasma <- df_plasma %>%
+  mutate(
+    Dosing = factor(Dosing, levels = dose_levels),
+    Model  = factor(Model,  levels = model_levels),
+    MIC    = factor(MIC, levels = c(0.25, 0.5, 1, 2, 4, 8))
+  ) %>%
+  arrange(Dosing, Target, Model, MIC)
+
+df_plasma <- df_plasma %>%
+  filter(MIC %in% c(0.25, 0.5, 1, 2, 4, 8))
+
+
+
+df_csf <- df_csf %>%
+  mutate(
+    Dosing = factor(Dosing, levels = dose_levels),
+    Model  = factor(Model,  levels = model_levels),
+    MIC    = factor(MIC, levels = c(0.25, 0.5, 1, 2, 4, 8))
+  ) %>%
+  arrange(Dosing, Target, Model, MIC)
+
+
+df_csf <- df_csf %>%
+  filter(MIC %in% c(0.25, 0.5, 1, 2, 4, 8))
+
+
+##---------------------------------------------------------------
+## Pivot Data to Wide Format (Ensure Numeric Values)
+##---------------------------------------------------------------
+
+plasma_wide <- df_plasma %>%
+  group_by(Dosing, Target, MIC, Model) %>%
+  summarise(Value = mean(Value, na.rm = TRUE), .groups = "drop") %>%  # Ensure unique rows
   pivot_wider(
-    id_cols = c(Dosing, Model),
-    names_from = MIC,
-    values_from = PTA_AUCP,
-    names_sep = "_"
+    id_cols = c(Dosing, Target),
+    names_from = c(MIC, Model),
+    values_from = Value,
+    names_sep = "_",
+    values_fn = mean  # Aggregate if duplicates exist
+  ) 
+
+
+csf_wide <- df_csf %>%
+  group_by(Dosing, Target, MIC, Model) %>%
+  summarise(Value = mean(Value, na.rm = TRUE), .groups = "drop") %>% 
+  pivot_wider(
+    id_cols = c(Dosing, Target),
+    names_from = c(MIC, Model),
+    values_from = Value,
+    names_sep = "_",
+    values_fn = mean
   )
 
-combined_PTA_AUC_wide_csf <- combined_PTA_AUC_results %>%
-  pivot_wider(
-    id_cols = c(Dosing, Model),
-    names_from = MIC,
-    values_from = PTA_AUCCSF,
-    names_sep = "_"
-  )
+##---------------------------------------------------------------
+## Construct Multi-Level Headers for Flextable
+##---------------------------------------------------------------
 
-# Update column names for better readability
-names(combined_PTA_AUC_wide_plasma)[-c(1, 2)] <- paste0("MIC = ", names(combined_PTA_AUC_wide_plasma)[-c(1, 2)])
-names(combined_PTA_AUC_wide_plasma)[1:2] <- c("Dosing", "Model")
-names(combined_PTA_AUC_wide_plasma) <- gsub("_", " - MIC = ", names(combined_PTA_AUC_wide_plasma))
+make_header_df <- function(col_names) {
+  hdr <- data.frame(col_keys = col_names, stringsAsFactors = FALSE)
+  hdr$line1 <- ""
+  hdr$line2 <- hdr$col_keys
 
-names(combined_PTA_AUC_wide_csf)[-c(1, 2)] <- paste0("MIC = ", names(combined_PTA_AUC_wide_csf)[-c(1, 2)])
-names(combined_PTA_AUC_wide_csf)[1:2] <- c("Dosing", "Model")
-names(combined_PTA_AUC_wide_csf) <- gsub("_", " - MIC = ", names(combined_PTA_AUC_wide_csf))
+  desired_mics <- c("0.25", "0.5", "1", "2", "4", "8")
+  desired_mods <- c("Li", "Luque", "DF")
 
-# Create flextables
-auc_flextable_plasma <- flextable(combined_PTA_AUC_wide_plasma) %>%
-  set_header_labels(
-    Dosing = "Dosing Regimen",
-    Model = "Model"
-  ) %>%
-  theme_vanilla() %>%                  # Apply a clean vanilla theme
-  bold(part = "header") %>%            # Make header bold
-  align(align = "center", part = "header") %>%  # Center-align header
-  align(align = "right", part = "body") %>%     # Right-align numeric data
-  autofit() %>%                        # Adjust column widths to fit content
-  fontsize(size = 10, part = "all")     # Set font size
+  for (mic in desired_mics) {
+    for (mod in desired_mods) {
+      colkey  <- paste0(mic, "_", mod)
+      top_lbl <- paste("MIC =", mic)
+      bot_lbl <- mod
+      hdr$line1[ hdr$col_keys == colkey ] <- top_lbl
+      hdr$line2[ hdr$col_keys == colkey ] <- bot_lbl
+    }
+  }
 
-auc_flextable_csf <- flextable(combined_PTA_AUC_wide_csf) %>%
-  set_header_labels(
-    Dosing = "Dosing Regimen",
-    Model = "Model"
-  ) %>%
-  theme_box() %>%
-  autofit()
+  hdr$line1[hdr$col_keys == "Dosing"] <- "LZD Dosing Regimen"
+  hdr$line2[hdr$col_keys == "Dosing"] <- "Dosing"
 
-# Create Word documents and add the formatted tables
-doc_plasma <- read_docx() %>%
-    body_add_par(value = "PTA AUC/MIC > 100 in Plasma", style = "heading 1") %>%
-  body_add_flextable(value = auc_flextable_plasma)
+  hdr$line1[hdr$col_keys == "Target"] <- "PK-PD Target"
+  hdr$line2[hdr$col_keys == "Target"] <- "Target"
 
-print(doc_plasma, target = "pta_auc_plasma.docx")
+  hdr
+}
 
-doc_csf <- read_docx() %>%
-    body_add_par(value = "PTA AUC/MIC > 100 in CSF ", style = "heading 1") %>%
-  body_add_flextable(value = auc_flextable_csf)
+plasma_header <- make_header_df(names(plasma_wide))
+csf_header    <- make_header_df(names(csf_wide))
 
-print(doc_csf, target = "pta_auc_csf.docx")
+##---------------------------------------------------------------
+## Create Flextables with Fixed Numeric Formatting
+##---------------------------------------------------------------
+
+make_flex <- function(data_wide, header_df) {
+  ft <- flextable(data_wide, col_keys = header_df$col_keys)
+
+  # Set multi-level headers
+  ft <- set_header_df(ft, mapping = header_df, key = "col_keys")
+
+  # Merge header cells where needed
+  ft <- merge_h(ft, part = "header")  
+
+  # Apply styling
+  ft <- ft %>%
+    theme_vanilla() %>%
+    bold(part = "header") %>%
+    align(align = "center", part = "header") %>%
+    align(align = "right",  part = "body") %>%
+    merge_v(j = "Dosing", part = "body") %>%
+    autofit() %>%
+    fontsize(size = 10, part = "all")
+
+  # **Custom Number Formatting: Remove .0 from whole numbers**
+  format_numbers <- function(x) {
+    ifelse(x == round(x), as.character(round(x)), sprintf("%.0f", x))
+  }
+
+  # Apply custom formatting to all numeric columns
+  numeric_cols <- names(data_wide)[-c(1,2)]  # Skip "Dosing" & "Target"
+  for (col in numeric_cols) {
+    ft <- colformat_num(ft, j = col, digits = 1)  # Standard rounding
+    ft <- compose(ft, j = col, value = as_paragraph(as_chunk(format_numbers(data_wide[[col]]))))
+  }
+
+  return(ft)
+}
+
+
+plasma_flex <- make_flex(plasma_wide, plasma_header)
+csf_flex    <- make_flex(csf_wide,    csf_header)
+
+
+
+##---------------------------------------------------------------
+## Export Flextables to Word Document
+##---------------------------------------------------------------
+
+doc <- read_docx() %>%
+  body_add_par(value = "Combined Plasma Results", style = "heading 1") %>%
+  body_add_flextable(plasma_flex) %>%
+  body_add_par(value = "") %>%
+  body_add_par(value = "Combined CSF Results", style = "heading 1") %>%
+  body_add_flextable(csf_flex)
+
+print(doc, target = "Combined_Plasma_and_CSF.docx")
+
+cat("Word document 'Combined_Plasma_and_CSF.docx' successfully created!\n")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1898,3 +1977,40 @@ dev.off()
 
 
 
+
+# List of packages
+packages <- c("mrgsolve", "dplyr", "ggplot2", "ggpubr", "ggsci", 
+              "flextable", "officer", "tidyr", "reshape2")
+
+# Detect R version
+r_version <- R.version
+r_citation <- citation()
+
+# Detect RStudio version (if available)
+rstudio_version <- tryCatch(
+  paste0("RStudio version ", rstudioapi::versionInfo()$version),
+  error = function(e) "RStudio version not detected"
+)
+
+# Open a file to write BibTeX references
+bib_file <- file("R_packages_citations.bib", "w")
+
+# Write R citation
+writeLines(toBibtex(r_citation), bib_file)
+
+# Write RStudio citation manually (since it doesn't have a built-in citation)
+writeLines("\n@Manual{RStudio,\n  title = {RStudio: Integrated Development Environment for R},\n  author = {RStudio Team},\n  year = {2024},\n  url = {https://posit.co/products/open-source/rstudio/},\n}\n", bib_file)
+
+# Write package citations
+for (pkg in packages) {
+  cite <- toBibtex(citation(pkg))
+  writeLines(cite, bib_file)
+}
+
+# Close the file
+close(bib_file)
+
+# Print message
+cat("BibTeX file 'R_packages_citations.bib' successfully created in your working directory.\n")
+cat("Detected R version:", r_version$version.string, "\n")
+cat("Detected", rstudio_version, "\n")
