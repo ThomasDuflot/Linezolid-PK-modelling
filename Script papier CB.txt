@@ -870,10 +870,12 @@ min_values <- combined_results_sim %>%
   summarise(
     min_DVf = min(DVf, na.rm = TRUE),
     min_DVCSF = min(DVCSF, na.rm = TRUE),
-    # Calculate AUC from 72 to 96 hours for plasma (AUCP) and CSF (AUCCSF)
-    AUCP_72_96 = max(AUCP, na.rm = TRUE) - min(AUCP, na.rm = TRUE),
-    AUCCSF_72_96 = max(AUCCSF, na.rm = TRUE) - min(AUCCSF, na.rm = TRUE)
-  )
+    AUCP_72_96 = max(AUCP) - min(AUCP),
+    AUCCSF_72_96 = max(AUCCSF) - min(AUCCSF)
+  ) %>%
+  # Reorder Model as "Li", "Luque", "DF"
+  mutate(Model = factor(Model, levels = c("Li", "Luque", "DF")))
+
 
 min_values <- min_values %>%
   mutate(
@@ -883,6 +885,51 @@ min_values <- min_values %>%
     AUCCSF_72_96 = round(AUCCSF_72_96, 0)  # Round AUC for CSF to whole numbers
   )
 
+
+Plasma_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCP_72_96, fill = Model)) +
+  geom_violin(position = position_dodge(width = 0.75), alpha = 0.3, color = "black", linewidth = 1.5) +  # Violin plot with darker borders
+  geom_boxplot(width = 0.2, position = position_dodge(width = 0.75), alpha = 0.7, outlier.shape = NA, color = "black", linewidth = 1.2) +  # Thicker boxplot borders
+  geom_point(aes(color = Model), position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75), alpha = 0.01, size = 1.5) +  # More transparent points
+  labs(
+    title = "Plasma AUC according to Dosing Regimen and Model",
+    x = "Dosing Regimen",
+    y = "AUC at steady state (mg/L.h)"
+  ) +
+  scale_fill_jco() +  # Apply JCO theme for fill colors
+  scale_color_jco() +  # Apply JCO theme for point colors
+  my_theme  # Apply the custom theme
+
+
+
+
+CSF_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCCSF_72_96, fill = Model)) +
+  geom_violin(position = position_dodge(width = 0.75), alpha = 0.3, color = "black", linewidth = 1.5) +  # Violin plot with darker borders
+  geom_boxplot(width = 0.2, position = position_dodge(width = 0.75), alpha = 0.7, outlier.shape = NA, color = "black", linewidth = 1.2) +  # Thicker boxplot borders
+  geom_point(aes(color = Model), position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75), alpha = 0.01, size = 1.5) +  # More transparent points
+  labs(
+    title = "CSF AUC according to Dosing Regimen and Model",
+    x = "Dosing Regimen",
+    y = "AUC at steady state (mg/L.h)"
+  ) +
+  scale_fill_jco() +  # Apply JCO theme for fill colors
+  scale_color_jco() +  # Apply JCO theme for point colors
+  my_theme  # Apply the custom theme
+
+
+combined_plot_AUC <- ggarrange(Plasma_AUC, CSF_AUC, 
+                           ncol = 1, nrow = 2,  # Arrange plots vertically
+                           labels = c("A", "B"),  # Add labels to the plots (optional)
+                           common.legend = TRUE,  # Use a common legend for both plots
+                           legend = "top")  # Position the legend at the top
+
+
+png("C:/Users/duflo/OneDrive/Bureau/LZD/AUC_Plot.png", width = 16, height = 9, units = 'in', res = 900)  # Specify width, height, and resolution
+
+# Print the plot to the device
+print(combined_plot_AUC)
+
+# Close the device
+dev.off()
 
 
 
@@ -912,31 +959,39 @@ summary_stats <- min_values %>%
     Q3_DVCSF = quantile(min_DVCSF, 0.75)
   )
 
-# Format results as "Mean ± SD" and "Median [25th-75th]" with rounding to 1 decimal place
 summary_stats <- summary_stats %>%
-  dplyr::mutate(
-    AUCP = paste0(sprintf("%.1f", Mean_AUCP), " ± ", sprintf("%.1f", SD_AUCP)),
-    AUCP_Median = paste0(sprintf("%.1f", Median_AUCP), " [", sprintf("%.1f", Q1_AUCP), "-", sprintf("%.1f", Q3_AUCP), "]"),
-    AUCCSF = paste0(sprintf("%.1f", Mean_AUCCSF), " ± ", sprintf("%.1f", SD_AUCCSF)),
-    AUCCSF_Median = paste0(sprintf("%.1f", Median_AUCCSF), " [", sprintf("%.1f", Q1_AUCCSF), "-", sprintf("%.1f", Q3_AUCCSF), "]"),
-    DVf = paste0(sprintf("%.1f", Mean_DVf), " ± ", sprintf("%.1f", SD_DVf)),
-    DVf_Median = paste0(sprintf("%.1f", Median_DVf), " [", sprintf("%.1f", Q1_DVf), "-", sprintf("%.1f", Q3_DVf), "]"),
-    DVCSF = paste0(sprintf("%.1f", Mean_DVCSF), " ± ", sprintf("%.1f", SD_DVCSF)),
-    DVCSF_Median = paste0(sprintf("%.1f", Median_DVCSF), " [", sprintf("%.1f", Q1_DVCSF), "-", sprintf("%.1f", Q3_DVCSF), "]")
+  # Reorder factors
+  mutate(
+    Dosing = factor(Dosing, 
+                    levels = c("600q12h", "600q8h", "600q6h", 
+                               "1200q24hCI", "1800q24hCI", "2400q24hCI")),
+    Model = factor(Model, levels = c("Li", "Luque", "DF"))
   ) %>%
-  select(Dosing, Model, AUCP, AUCP_Median, AUCCSF, AUCCSF_Median, DVf, DVf_Median, DVCSF, DVCSF_Median)
+  # Sort rows by the factor order
+  arrange(Dosing, Model) %>%
+  # Rename columns
+  rename(
+    "Plasma AUC (mg/L.h)" = AUCP_Median,
+    "CSF AUC (mg/L.h)"    = AUCCSF_Median,
+    "Plasma Cmin (mg/L)" = DVf_Median,
+    "CSF Cmin (mg/L)"     = DVCSF_Median
+  ) %>%
+  # Keep only the specified columns in final output
+  select(Dosing, Model, 
+         "Plasma AUC (mg/L.h)", 
+         "CSF AUC (mg/L.h)", 
+         "Plasma Cmin (mg/L)",
+         "CSF Cmin (mg/L)")
 
-# Create a flextable from the formatted summary_stats dataframe
-summary_table <- flextable(summary_stats)
-
-# Adjust the table appearance for publication
-summary_table <- summary_table %>%
-  theme_vanilla() %>%                  # Apply a clean vanilla theme
-  bold(part = "header") %>%            # Make header bold
-  align(align = "center", part = "header") %>%  # Center-align header
-  align(align = "right", part = "body") %>%     # Right-align numeric data
-  autofit() %>%                        # Adjust column widths to fit content
-  fontsize(size = 10, part = "all")     # Set font size
+# Create the flextable
+summary_table <- flextable(summary_stats) %>%
+  theme_vanilla() %>% 
+  bold(part = "header") %>%
+  align(align = "center", part = "header") %>%
+  align(align = "right", part = "body") %>%
+  merge_v(j = "Dosing") %>%    # merge identical Dosing cells
+  autofit() %>%
+  fontsize(size = 10, part = "all")
 
 # Create a Word document and add the formatted table
 doc <- read_docx() %>%
@@ -1188,7 +1243,6 @@ dev.off()
 
 
 
-
 combined_PTA_AUC_results<-combined_results_AUC
 
 
@@ -1419,7 +1473,6 @@ print(combined_plot_PTA_fT)
 
 # Close the device
 dev.off()
-
 
 
 
@@ -1714,105 +1767,6 @@ doc_csf <- read_docx() %>%
   body_add_flextable(value = auc_flextable_csf)
 
 print(doc_csf, target = "pta_auc_csf.docx")
-
-
-
-
-
-
-
-
-
-
-
-Plasma_AUC <- ggplot(combined_results_AUC, aes(x = Dosing, y = AUCP_72_96, fill = Model)) +
-
-  geom_violin(position = position_dodge(width = 0.75), alpha = 0.3, color = "black", linewidth = 1.5) +  # Violin plot with darker borders
-
-  geom_boxplot(width = 0.2, position = position_dodge(width = 0.75), alpha = 0.7, outlier.shape = NA, color = "black", linewidth = 1.2) +  # Thicker boxplot borders
-
-  geom_point(aes(color = Model), position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75), alpha = 0.01, size = 1.5) +  # More transparent points
-
-  labs(
-
-    title = "Plasma AUC according to Dosing Regimen and Model",
-
-    x = "Dosing Regimen",
-
-    y = "AUC at steady state (mg/L.h)"
-
-  ) +
-
-  scale_fill_jco() +  # Apply JCO theme for fill colors
-
-  scale_color_jco() +  # Apply JCO theme for point colors
-
-  my_theme  # Apply the custom theme
-
-
-
-
-
-
-
-
-
-CSF_AUC <- ggplot(combined_results_AUC, aes(x = Dosing, y = AUCCSF_72_96, fill = Model)) +
-
-  geom_violin(position = position_dodge(width = 0.75), alpha = 0.3, color = "black", linewidth = 1.5) +  # Violin plot with darker borders
-
-  geom_boxplot(width = 0.2, position = position_dodge(width = 0.75), alpha = 0.7, outlier.shape = NA, color = "black", linewidth = 1.2) +  # Thicker boxplot borders
-
-  geom_point(aes(color = Model), position = position_jitterdodge(jitter.width = 0.1, dodge.width = 0.75), alpha = 0.01, size = 1.5) +  # More transparent points
-
-  labs(
-
-    title = "CSF AUC according to Dosing Regimen and Model",
-
-    x = "Dosing Regimen",
-
-    y = "AUC at steady state (mg/L.h)"
-
-  ) +
-
-  scale_fill_jco() +  # Apply JCO theme for fill colors
-
-  scale_color_jco() +  # Apply JCO theme for point colors
-
-  my_theme  # Apply the custom theme
-
-
-
-
-
-combined_plot_AUC <- ggarrange(Plasma_AUC, CSF_AUC, 
-
-                           ncol = 1, nrow = 2,  # Arrange plots vertically
-
-                           labels = c("A", "B"),  # Add labels to the plots (optional)
-
-                           common.legend = TRUE,  # Use a common legend for both plots
-
-                           legend = "top")  # Position the legend at the top
-
-
-
-
-
-png("D:/MOBILITE/Charles B/VF/AUC_Plot.png", width = 16, height = 9, units = 'in', res = 900)  # Specify width, height, and resolution
-
-
-
-# Print the plot to the device
-
-print(combined_plot_AUC)
-
-
-
-# Close the device
-
-dev.off()
-
 
 
 
