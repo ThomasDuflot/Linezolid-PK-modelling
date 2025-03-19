@@ -960,23 +960,20 @@ summary_stats <- min_values %>%
     Q3_DVCSF = quantile(min_DVCSF, 0.75)
   )
 
+# Define the factor levels for ordering
 summary_stats <- summary_stats %>%
-  # Reorder factors
   mutate(
-    Dosing = factor(Dosing, 
-                    levels = c("600q12h", "600q8h", "600q6h", 
-                               "1200q24hCI", "1800q24hCI", "2400q24hCI")),
+    Dosing = factor(Dosing, levels = c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI")),
     Model = factor(Model, levels = c("Li", "Luque", "DF"))
   ) %>%
-  # Sort rows by the factor order
-  arrange(Dosing, Model) %>%
-  # Rename columns
-  rename(
-    "Plasma AUC (mg/L.h)" = Median_AUCP,
-    "CSF AUC (mg/L.h)"    = Median_AUCCSF,
-    "Plasma Cmin (mg/L)" = Median_DVf,
-    "CSF Cmin (mg/L)"     = Median_DVCSF
-  ) %>%
+  arrange(Dosing, Model) %>% # Ensure correct ordering
+ dplyr::mutate(
+    `Plasma AUC (mg/L.h)` = paste0(sprintf("%.1f", Median_AUCP), " [", sprintf("%.1f", Q1_AUCP), "-", sprintf("%.1f", Q3_AUCP), "]"),
+    `CSF AUC (mg/L.h)` = paste0(sprintf("%.1f", Median_AUCCSF), " [", sprintf("%.1f", Q1_AUCCSF), "-", sprintf("%.1f", Q3_AUCCSF), "]"),
+    `Plasma Cmin (mg/L)` = paste0(sprintf("%.1f", Median_DVf), " [", sprintf("%.1f", Q1_DVf), "-", sprintf("%.1f", Q3_DVf), "]"),
+    `CSF Cmin (mg/L)` = paste0(sprintf("%.1f", Median_DVCSF), " [", sprintf("%.1f", Q1_DVCSF), "-", sprintf("%.1f", Q3_DVCSF), "]")
+  )
+summary_stats <- summary_stats %>%
   # Keep only the specified columns in final output
   select(Dosing, Model, 
          "Plasma AUC (mg/L.h)", 
@@ -1000,7 +997,6 @@ doc <- read_docx() %>%
 
 # Save the Word document
 print(doc, target = "summary_stats_table.docx")
-
 
 
 
