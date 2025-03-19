@@ -1406,69 +1406,115 @@ combined_results_fT <- merge(combined_results_fT, filtered_mic_distribution, by.
 combined_results_fT$Dosing <- factor(combined_results_fT$Dosing, levels = c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI"))
 combined_results_fT$MIC_Distribution <- "MIC Frequency (%)"
 
-PTA_fT_Plasma <- ggplot(combined_results_fT %>% filter(Model == "Li"), aes(x = factor(MIC))) + 
-  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution), stat = "identity", alpha = 0.5, width = 0.75) +  # MIC frequency as bars (for one model)
-  geom_line(data = combined_results_fT, aes(x = factor(MIC), y = PTA_DVf, group = Model, color = Model), size = 1.5) +  # Line plot for PTA curves for both models
-  geom_point(data = combined_results_fT, aes(x = factor(MIC), y = PTA_DVf, shape = Model), color = "black", size = 3) +  # Black points with different shapes for both models
-  geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +  # Dashed line at 90% PTA
-  scale_color_jco() +  # Use the JCO color scheme
-  scale_fill_manual(values = c("MIC Frequency (%)" = "darkgray"), name = "MIC Distribution (%)") +  # Set color for MIC distribution bars, customize legend
-  scale_y_continuous(name = "PTA (%)", breaks = seq(0, 100, by = 10)) +  # Y-axis limits and breaks
-  facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
+# Make sure to load necessary packages and define 'my_theme' first.
+# We'll show the relevant parts focusing on the legend ordering.
+
+PTA_fT_Plasma <- ggplot(combined_results_fT %>% filter(Model == "Li"), 
+                        aes(x = factor(MIC))) + 
+  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution), 
+           stat = "identity", alpha = 0.5, width = 0.75) +
+  
+  geom_line(
+    data = combined_results_fT, 
+    aes(x = factor(MIC), y = PTA_DVf, group = Model, color = Model),
+    size = 1.5
+  ) +
+  geom_point(
+    data = combined_results_fT, 
+    aes(x = factor(MIC), y = PTA_DVf, shape = Model),
+    color = "black", size = 3
+  ) +
+  
+  geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +
+  
+  # Set up manual fill scale for MIC frequency distribution.
+  # Assign guide = guide_legend(order = 1) so it appears first in the legend.
+  scale_fill_manual(
+    values = c("MIC Frequency (%)" = "darkgray"),
+    name = "MIC Distribution (%)"
+  ) +
+  
+  # Use JCO color scale for lines, and specify order = 2 in the legend
+  scale_color_jco(
+    name = "Model",
+    guide = guide_legend(order = 2)
+  ) +
+  
+  # Assign shapes to each model, also order = 2 to align with 'Model'
+  scale_shape_manual(
+    values = c("Li" = 16, "Luque" = 17, "DF" = 15),  # Example shapes
+    name = "Model",
+    guide = guide_legend(order = 2)
+  ) +
+
+  scale_y_continuous(name = "PTA (%)", breaks = seq(0, 100, by = 10)) +
+  facet_wrap(~ Dosing, scales = "free_x") +
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) and MIC Distribution (%)") +
   ggtitle("PTA (fT > MIC 85% for plasma LZD concentration)") + 
   my_theme + 
   theme(
-    strip.background = element_blank(),   # Clean up facet strip background
-    strip.placement = "outside",          # Position facet strips outside the plot
-    axis.text.y.right = element_text(color = "gray"),  # Make the right y-axis text gray to match the bars
-    legend.title = element_text(size = 12),  # Customize the size of the legend title
-    legend.position = "top"               # Position legend at the top
+    strip.background  = element_blank(),
+    strip.placement   = "outside",
+    axis.text.y.right = element_text(color = "gray"),
+    legend.title      = element_text(size = 12),
+    legend.position   = "top"
   )
 
-# Create the PTA plot for fT > MIC for CSF
-PTA_fT_CSF <- ggplot(combined_results_fT %>% filter(Model == "Li"), aes(x = factor(MIC))) + 
-  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution), stat = "identity", alpha = 0.5, width = 0.75) +  # MIC frequency as bars (for one model)
-  geom_line(data = combined_results_fT, aes(x = factor(MIC), y = PTA_DVCSF, group = Model, color = Model), size = 1.5) +  # Line plot for PTA curves for both models
-  geom_point(data = combined_results_fT, aes(x = factor(MIC), y = PTA_DVCSF, shape = Model), color = "black", size = 3) +  # Black points with different shapes for both models
-  geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +  # Dashed line at 90% PTA
-  scale_color_jco() +  # Use the JCO color scheme
-  scale_fill_manual(values = c("MIC Frequency (%)" = "darkgray"), name = "MIC Distribution (%)") +  # Set color for MIC distribution bars, customize legend
-  scale_y_continuous(name = "PTA (%)", breaks = seq(0, 100, by = 10)) +  # Y-axis limits and breaks
-  facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
+PTA_fT_CSF <- ggplot(combined_results_fT %>% filter(Model == "Li"), 
+                     aes(x = factor(MIC))) + 
+  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution), 
+           stat = "identity", alpha = 0.5, width = 0.75) +
+  
+  geom_line(
+    data = combined_results_fT, 
+    aes(x = factor(MIC), y = PTA_DVCSF, group = Model, color = Model),
+    size = 1.5
+  ) +
+  geom_point(
+    data = combined_results_fT, 
+    aes(x = factor(MIC), y = PTA_DVCSF, shape = Model),
+    color = "black", size = 3
+  ) +
+  
+  geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +
+  
+  scale_fill_manual(
+    values = c("MIC Frequency (%)" = "darkgray"),
+    name = "MIC Distribution (%)",
+    guide = guide_legend(order = 1)
+  ) +
+  scale_color_jco(
+    name = "Model",
+    guide = guide_legend(order = 2)
+  ) +
+  scale_shape_manual(
+    values = c("Li" = 16, "Luque" = 17, "DF" = 15),
+    name = "Model",
+    guide = guide_legend(order = 2)
+  ) +
+
+  scale_y_continuous(name = "PTA (%)", breaks = seq(0, 100, by = 10)) +
+  facet_wrap(~ Dosing, scales = "free_x") +
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) and MIC Distribution (%)") +
   ggtitle("PTA (fT > MIC 85% for CSF LZD concentration)") + 
   my_theme + 
   theme(
-    strip.background = element_blank(),   # Clean up facet strip background
-    strip.placement = "outside",          # Position facet strips outside the plot
-    axis.text.y.right = element_text(color = "gray"),  # Make the right y-axis text gray to match the bars
-    legend.title = element_text(size = 12),  # Customize the size of the legend title
-    legend.position = "top"               # Position legend at the top
+    strip.background  = element_blank(),
+    strip.placement   = "outside",
+    axis.text.y.right = element_text(color = "gray"),
+    legend.title      = element_text(size = 12),
+    legend.position   = "top"
   )
 
-# Combine both plots
-combined_plot_PTA_fT <- ggarrange(PTA_fT_Plasma, PTA_fT_CSF, 
-                                  ncol = 1, nrow = 2,  # Arrange plots vertically
-                                  labels = c("A", "B"),  # Add labels to the plots (optional)
-                                  common.legend = TRUE,  # Use a common legend for both plots
-                                  legend = "top")  # Position the legend at the top
 
 
 
 
-
-
-
-
-png("C:/Users/duflo/OneDrive/Bureau/LZD/PTA_fT_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
-
-# Print the plot to the device
+png("C:/Users/duflo/OneDrive/Bureau/LZD/PTA_fT_MIC.png", 
+    width = 12, height = 16, units = 'in', res = 900)
 print(combined_plot_PTA_fT)
-
-# Close the device
 dev.off()
 
 
@@ -1765,6 +1811,90 @@ doc_csf <- read_docx() %>%
 
 print(doc_csf, target = "pta_auc_csf.docx")
 
+
+
+
+
+# Ensure correct order for dosing regimens
+dosing_order <- c("600q12h", "600q8h", "600q6h", "1200q24hCI", "1800q24hCI", "2400q24hCI")
+
+# Function to compute CFR for each scenario
+compute_CFR <- function(.data, pta_col) {
+  .data %>%
+    group_by(Dosing, Model, MIC) %>%
+    summarize(
+      PTA_value = mean(.data[[pta_col]], na.rm = TRUE),
+      freq      = mean(Percent_Frequency, na.rm = TRUE),  # Convert frequency to percentage
+      .groups   = "drop"
+    ) %>%
+    group_by(Dosing, Model) %>%
+    summarize(
+      CFR = sum(PTA_value * freq / 100, na.rm = TRUE),  # Convert to percentage
+      .groups = "drop"
+    ) %>%
+    mutate(
+      Model = factor(Model, levels = c("Li", "Luque", "DF")),  # Ensure model order
+      Regimen_Type = factor(ifelse(Dosing %in% c("600q12h", "600q8h", "600q6h"), 
+                            "Intermittent", "Continuous Infusion"),
+                            levels = c("Intermittent", "Continuous Infusion")),  # Ensure correct order
+      Dosing = factor(Dosing, levels = dosing_order)  # Ensure dosing regimen order
+    )
+}
+
+# Compute CFR for each condition
+df_CFR_fT_Plasma <- compute_CFR(combined_results_fT, "PTA_DVf")
+df_CFR_fT_CSF    <- compute_CFR(combined_results_fT, "PTA_DVCSF")
+df_CFR_AUC_Plasma <- compute_CFR(combined_PTA_AUC_results, "PTA_AUCP")
+df_CFR_AUC_CSF    <- compute_CFR(combined_PTA_AUC_results, "PTA_AUCCSF")
+
+# Function to create CFR plot
+plot_CFR <- function(df, plot_title) {
+  ggplot(df, aes(x = Dosing, y = CFR, color = Model, shape = Model, group = Model)) +
+    geom_point(size = 4) +                         # Large points for clarity
+    geom_line(size = 1.2) +                        # Connect points with lines
+    facet_wrap(~ Regimen_Type, scales = "free") + # Facet by administration type (Intermittent first)
+    scale_color_jco() +                             # Use JCO color scheme
+    scale_shape_manual(values = c(15, 17, 19)) +    # Square, triangle, circle for models
+    scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, by = 10)) +  
+    labs(
+      title = plot_title,
+      x = "LZD Infusion Regimen",
+      y = "CFR (%)"
+    ) +
+    my_theme + 
+
+    theme(
+      legend.position = "top",
+      axis.text.x = element_text(angle = 45, hjust = 1),  # Tilt x-axis labels for readability
+      strip.text = element_text(size = 14, face = "bold")  # Bold facet titles
+    )+ theme(
+    panel.spacing.x = unit(2, "lines"),  # Increase horizontal gap
+    panel.spacing.y = unit(1, "lines")   # Use 1 (or whatever) for vertical gap
+  )
+}
+
+# Generate individual plots
+plot_CFR_fT_Plasma <- plot_CFR(df_CFR_fT_Plasma, "CFR (fT > MIC for Plasma)")
+plot_CFR_fT_CSF <- plot_CFR(df_CFR_fT_CSF, "CFR (fT > MIC for CSF)")
+plot_CFR_AUC_Plasma <- plot_CFR(df_CFR_AUC_Plasma, "CFR (AUC/MIC > 100 for Plasma)")
+plot_CFR_AUC_CSF <- plot_CFR(df_CFR_AUC_CSF, "CFR (AUC/MIC > 100 for CSF)")
+
+# Arrange all plots into one figure using ggarrange()
+combined_CFR_plot <- ggarrange(
+  plot_CFR_fT_Plasma, plot_CFR_fT_CSF, 
+  plot_CFR_AUC_Plasma, plot_CFR_AUC_CSF,
+  ncol = 2, nrow = 2,                        # Arrange in a 2x2 grid
+  labels = c("A", "B", "C", "D"),            # Panel labels
+  common.legend = TRUE, legend = "top"       # Common legend at the top
+)
+
+# Display final combined plot
+print(combined_CFR_plot)
+
+# Save as PNG
+png("CFR_Combined_Plot.png", width = 16, height = 12, units = "in", res = 300)
+print(combined_CFR_plot)
+dev.off()
 
 
 
