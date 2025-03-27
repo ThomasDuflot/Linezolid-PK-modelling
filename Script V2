@@ -895,7 +895,7 @@ Plasma_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCP_72_96, fill = Model)) 
   geom_boxplot(width = 0.2, position = position_dodge(width = 0.85), alpha = 0.7, 
                outlier.shape = NA, color = "black", linewidth = 1.2) +  
   labs(
-    title = "Plasma AUC according to Dosing Regimen and Model",
+    title = "Plasma fAUC according to Dosing Regimen and Model",
     x = "Dosing Regimen",
     y = "fAUC at steady state (mg/L.h)"
   ) +
@@ -910,7 +910,7 @@ CSF_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCCSF_72_96, fill = Model)) +
   geom_boxplot(width = 0.2, position = position_dodge(width = 0.85), alpha = 0.7, 
                outlier.shape = NA, color = "black", linewidth = 1.2) +  
   labs(
-    title = "CSF AUC according to Dosing Regimen and Model",
+    title = "CSF fAUC according to Dosing Regimen and Model",
     x = "Dosing Regimen",
     y = "fAUC at steady state (mg/L.h)"
   ) +
@@ -1361,7 +1361,7 @@ PTA_AUC_Plasma <- ggplot(combined_PTA_AUC_results  %>% filter(Model == "Li"), ae
   facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) ") +
-  ggtitle("PTA (AUC/MIC > 100 for plasma LZD concentration)") + 
+  ggtitle("PTA (fAUC/MIC > 69 for plasma LZD concentration)") + 
   my_theme + 
   theme(
     strip.background = element_blank(),   # Clean up facet strip background
@@ -1383,7 +1383,7 @@ PTA_AUC_CSF <- ggplot(combined_PTA_AUC_results %>% filter(Model == "Li"), aes(x 
   facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) and MIC Distribution (%)") +
-  ggtitle("PTA (AUC/MIC > 100 for CSF LZD concentration)") + 
+  ggtitle("PTA (fAUC/MIC > 69 for CSF LZD concentration)") + 
   my_theme + 
   theme(
     strip.background = element_blank(),   # Clean up facet strip background
@@ -1977,8 +1977,8 @@ plot_CFR <- function(df, plot_title) {
 # Generate individual plots
 plot_CFR_fT_Plasma <- plot_CFR(df_CFR_fT_Plasma, "CFR (fT > MIC for Plasma)")
 plot_CFR_fT_CSF <- plot_CFR(df_CFR_fT_CSF, "CFR (fT > MIC for CSF)")
-plot_CFR_AUC_Plasma <- plot_CFR(df_CFR_AUC_Plasma, "CFR (AUC/MIC > 100 for Plasma)")
-plot_CFR_AUC_CSF <- plot_CFR(df_CFR_AUC_CSF, "CFR (AUC/MIC > 100 for CSF)")
+plot_CFR_AUC_Plasma <- plot_CFR(df_CFR_AUC_Plasma, "CFR (AUC/MIC > 69 for Plasma)")
+plot_CFR_AUC_CSF <- plot_CFR(df_CFR_AUC_CSF, "CFR (fAUC/MIC > 69 for CSF)")
 
 # Arrange all plots into one figure using ggarrange()
 combined_CFR_plot <- ggarrange(
