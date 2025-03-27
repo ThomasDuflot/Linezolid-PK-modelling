@@ -888,7 +888,7 @@ min_values <- min_values %>%
 
 
 custom_breaks <- c(10, 30, 50, 100, 300, 500, 1000)
-
+y_limits <- c(10,1000)
 # Plasma AUC Plot
 Plasma_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCP_72_96, fill = Model)) +
   geom_violin(position = position_dodge(width = 0.85), alpha = 0.3, color = "black", linewidth = 1.5) +  
@@ -897,7 +897,7 @@ Plasma_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCP_72_96, fill = Model)) 
   labs(
     title = "Plasma AUC according to Dosing Regimen and Model",
     x = "Dosing Regimen",
-    y = "AUC at steady state (mg/L.h)"
+    y = "fAUC at steady state (mg/L.h)"
   ) +
   scale_fill_jco() +  
   scale_color_jco() +  
@@ -912,7 +912,7 @@ CSF_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCCSF_72_96, fill = Model)) +
   labs(
     title = "CSF AUC according to Dosing Regimen and Model",
     x = "Dosing Regimen",
-    y = "AUC at steady state (mg/L.h)"
+    y = "fAUC at steady state (mg/L.h)"
   ) +
   scale_fill_jco() +  
   scale_color_jco() +  
@@ -1526,7 +1526,11 @@ PTA_fT_CSF <- ggplot(combined_results_fT %>% filter(Model == "Li"),
   )
 
 
-
+combined_plot_PTA_fT <- ggarrange(PTA_fT_Plasma, PTA_fT_CSF, 
+                               ncol = 1, nrow = 2,  # Arrange plots vertically
+                               labels = c("A", "B"),  # Add labels to the plots (optional)
+                               common.legend = TRUE,  # Use a common legend for both plots
+                               legend = "top")  # Position the legend at the top
 
 
 png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/PTA_fT_MIC.png", 
