@@ -8,7 +8,7 @@ library(officer)
 library(tidyr)
 library(reshape2)
 
-setwd("C:/Users/duflo/OneDrive/Bureau/LZD")
+setwd("C:/Users/duflo/OneDrive/Bureau/LZD/V2")
 set.seed(123)
 
 my_theme <- theme_minimal(base_size = 16) +
@@ -523,7 +523,7 @@ n_individuals <- 1000
 Luque_model_name <- "Luque"  # Add the model name here
 MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
 
-Luque_AUC_PTA_results <- list()  # Store PTA results for AUC/MIC > 10
+Luque_AUC_PTA_results <- list()  # Store PTA results for AUC/MIC > 100
 
 for (Luque_event_name in names(Luque_events)) {
   Luque_ev_current <- Luque_events[[Luque_event_name]]
@@ -548,16 +548,16 @@ for (Luque_event_name in names(Luque_events)) {
     mutate(Dosing = factor(Luque_event_name),          # Add a column for event as a factor
            Model = factor(Luque_model_name))           # Add a column for model as a factor
   
-  # Function to calculate PTA for AUC/MIC > 10
+  # Function to calculate PTA for AUC/MIC > 100
   calc_pta_for_AUC_MIC <- function(data, MIC) {
     # Calculate the AUC/MIC ratio and determine if it is greater than 10
     Luque_pta_AUCP <- data %>%
       mutate(AUC_MIC_P = AUCP_72_96 / MIC) %>% 
-      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 100
+      summarize(PTA_AUCP = mean(AUC_MIC_P > 69) * 100)  # % of patients with AUC/MIC > 100
     
     Luque_pta_AUCCSF <- data %>%
       mutate(AUC_MIC_CSF = AUCCSF_72_96 / MIC) %>%
-      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 100
+      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 69) * 100)  # % of patients with AUC/MIC > 100
     
     return(c(PTA_AUCP = Luque_pta_AUCP$PTA_AUCP, PTA_AUCCSF = Luque_pta_AUCCSF$PTA_AUCCSF))
   }
@@ -591,7 +591,7 @@ n_individuals <- 1000
 Li_model_name <- "Li"  # Add the model name here
 MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)  # Define the MIC thresholds
 
-Li_AUC_PTA_results <- list()  # Store PTA results for AUC/MIC > 10
+Li_AUC_PTA_results <- list()  # Store PTA results for AUC/MIC > 100
 
 for (Li_event_name in names(Li_events)) {
   Li_ev_current <- Li_events[[Li_event_name]]
@@ -616,16 +616,16 @@ for (Li_event_name in names(Li_events)) {
     mutate(Dosing = factor(Li_event_name),          # Add a column for event as a factor
            Model = factor(Li_model_name))           # Add a column for model as a factor
   
-  # Function to calculate PTA for AUC/MIC > 10
+  # Function to calculate PTA for AUC/MIC > 100
   calc_pta_for_AUC_MIC <- function(data, MIC) {
     # Calculate the AUC/MIC ratio and determine if it is greater than 10
     Li_pta_AUCP <- data %>%
       mutate(AUC_MIC_P = AUCP_72_96 / MIC) %>% 
-      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 10
+      summarize(PTA_AUCP = mean(AUC_MIC_P > 69) * 100)  # % of patients with AUC/MIC > 10
     
     Li_pta_AUCCSF <- data %>%
       mutate(AUC_MIC_CSF = AUCCSF_72_96 / MIC) %>%
-      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 10
+      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 69) * 100)  # % of patients with AUC/MIC > 10
     
     return(c(PTA_AUCP = Li_pta_AUCP$PTA_AUCP, PTA_AUCCSF = Li_pta_AUCCSF$PTA_AUCCSF))
   }
@@ -683,16 +683,16 @@ for (DF_event_name in names(DF_events)) {
     mutate(Dosing = factor(DF_event_name),          # Add a column for event as a factor
            Model = factor(DF_model_name))           # Add a column for model as a factor
   
-  # Function to calculate PTA for AUC/MIC > 10
+  # Function to calculate PTA for AUC/MIC > 100
   calc_pta_for_AUC_MIC <- function(data, MIC) {
     # Calculate the AUC/MIC ratio and determine if it is greater than 10
     DF_pta_AUCP <- data %>%
       mutate(AUC_MIC_P = AUCP_72_96 / MIC) %>% 
-      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 10
+      summarize(PTA_AUCP = mean(AUC_MIC_P > 69) * 100)  # % of patients with AUC/MIC > 10
     
     DF_pta_AUCCSF <- data %>%
       mutate(AUC_MIC_CSF = AUCCSF_72_96 / MIC) %>%
-      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 10
+      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 69) * 100)  # % of patients with AUC/MIC > 10
     
     return(c(PTA_AUCP = DF_pta_AUCP$PTA_AUCP, PTA_AUCCSF = DF_pta_AUCCSF$PTA_AUCCSF))
   }
@@ -929,7 +929,7 @@ combined_plot_AUC <- ggarrange(
 )
 
 # Save combined plot
-png("C:/Users/duflo/OneDrive/Bureau/LZD/AUC_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
+png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/AUC_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
 print(combined_plot_AUC)
 dev.off()
 
@@ -985,7 +985,7 @@ combined_plot_Cmin <- ggarrange(
 
 
 # Save combined plot
-png("C:/Users/duflo/OneDrive/Bureau/LZD/Cmin_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
+png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/Cmin_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
 print(combined_plot_Cmin)
 dev.off()
 
@@ -1242,7 +1242,7 @@ combined_plot_Sim <- ggarrange(
 
 print(combined_plot_Sim)
 
-png("C:/Users/duflo/OneDrive/Bureau/LZD/Sim_Plot.png", width = 24, height = 12, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/Sim_Plot.png", width = 24, height = 12, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_Sim)
@@ -1402,7 +1402,7 @@ combined_plot_PTA <- ggarrange(PTA_AUC_Plasma, PTA_AUC_CSF,
 
 
 
-png("C:/Users/duflo/OneDrive/Bureau/LZD/PTA_AUC_Plot_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/PTA_AUC_Plot_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_PTA)
@@ -1529,7 +1529,7 @@ PTA_fT_CSF <- ggplot(combined_results_fT %>% filter(Model == "Li"),
 
 
 
-png("C:/Users/duflo/OneDrive/Bureau/LZD/PTA_fT_MIC.png", 
+png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/PTA_fT_MIC.png", 
     width = 12, height = 16, units = 'in', res = 900)
 print(combined_plot_PTA_fT)
 dev.off()
@@ -1683,7 +1683,7 @@ print(MIC_Distrib)
 
 
 
-png("C:/Users/duflo/OneDrive/Bureau/LZD/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 print(MIC_Distrib)
 dev.off()
 
