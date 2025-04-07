@@ -8,7 +8,7 @@ library(officer)
 library(tidyr)
 library(reshape2)
 
-setwd("C:/Users/duflo/OneDrive/Bureau/LZD/V2")
+setwd("C:/Users/duflo/OneDrive/Bureau/LZD/V3")
 set.seed(123)
 
 my_theme <- theme_minimal(base_size = 16) +
@@ -1975,8 +1975,8 @@ plot_CFR <- function(df, plot_title) {
 }
 
 # Generate individual plots
-plot_CFR_fT_Plasma <- plot_CFR(df_CFR_fT_Plasma, "CFR (fT > MIC for Plasma)")
-plot_CFR_fT_CSF <- plot_CFR(df_CFR_fT_CSF, "CFR (fT > MIC for CSF)")
+plot_CFR_fT_Plasma <- plot_CFR(df_CFR_fT_Plasma, "CFR (fT > MIC 85% for Plasma)")
+plot_CFR_fT_CSF <- plot_CFR(df_CFR_fT_CSF, "CFR (fT > MIC 85% for CSF)")
 plot_CFR_AUC_Plasma <- plot_CFR(df_CFR_AUC_Plasma, "CFR (AUC/MIC > 69 for Plasma)")
 plot_CFR_AUC_CSF <- plot_CFR(df_CFR_AUC_CSF, "CFR (fAUC/MIC > 69 for CSF)")
 
