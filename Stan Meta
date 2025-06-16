@@ -1,0 +1,188 @@
+## ──────────────────────────────────────────────────────────────
+## 0.  Load libraries   (install once if needed)
+## ──────────────────────────────────────────────────────────────
+
+
+library(cmdstanr)
+library(yaml)
+library(posterior)
+
+## ================================================================
+##  Meta-PK gold-standard fit – copy-paste & run
+## ================================================================
+##  If needed the first time, uncomment the next three lines:
+# install.packages("cmdstanr", repos = "https://cloud.r-project.org")
+# cmdstanr::install_cmdstan()
+# install.packages(c("posterior", "yaml"))
+
+library(cmdstanr)
+library(posterior)
+library(yaml)
+
+## ────────────────────────────────────────────────────────────────
+## 1.  Write the non-centred Stan model to disk
+## ────────────────────────────────────────────────────────────────
+stan_code <- '
+functions{
+  real lnorm_obs_lpdf(real y, real mu, real se){
+    return normal_lpdf(log(y) | mu, se) - log(y);   // add Jacobian
+  }
+}
+
+data{
+  int<lower=1> N;                       // # studies (3)
+  int<lower=1> K;                       // # core parameters (7)
+  array[N] vector[K] theta_hat;         // published typical values
+  array[N] vector[K] se_theta;          // SE of log(theta_hat)
+  array[N] vector[K] omega_hat;         // IIV variances (0 if missing)
+  array[N] vector[K] is_obs;            // 1 if theta_hat present
+  vector[K]        prior_mu;            // weak prior means (natural scale)
+}
+
+parameters{
+  vector[K]         mu_logtheta;        // grand means
+  vector<lower=0>[K] tau_logtheta;      // ISV SD
+  vector<lower=0>[K] mu_omega;          // mean IIV
+  vector<lower=0>[K] tau_omega;         // IIV SD between studies
+  array[N] vector[K] z_theta;           // non-centred std normals
+  array[N] vector[K] z_omega;
+}
+
+transformed parameters{
+  array[N] vector[K] log_theta;
+  array[N] vector[K] omega_iiv;
+  for (i in 1:N){
+    log_theta[i] = mu_logtheta + tau_logtheta .* z_theta[i];
+    omega_iiv[i] = exp( log(mu_omega) + tau_omega .* z_omega[i] );
+  }
+}
+
+model{
+  // ── Hyper-priors
+  mu_logtheta  ~ normal( log(prior_mu) , 0.5 );
+  tau_logtheta ~ normal( 0 , 0.5 );     // half-N(0,0.5)
+  mu_omega     ~ normal( 0.1 , 1 );
+  tau_omega    ~ normal( 0 , 0.3 );
+
+  // ── Standard normals
+  for (i in 1:N){
+    z_theta[i] ~ normal(0,1);
+    z_omega[i] ~ normal(0,1);
+  }
+
+  // ── Likelihood
+  for (i in 1:N){
+    for (k in 1:K){
+      if (is_obs[i,k] == 1)
+        target += lnorm_obs_lpdf(theta_hat[i,k] |
+                                 log_theta[i,k] ,
+                                 se_theta[i,k]);
+      if (omega_hat[i,k] > 0)
+        omega_iiv[i,k] ~ lognormal( log(omega_hat[i,k]) , 0.3 );
+    }
+  }
+}
+
+generated quantities{
+  vector[K] theta_meta = exp(mu_logtheta);   // pooled typicals
+}
+'
+writeLines(stan_code, "meta_pk_nc.stan")
+cat("✓ wrote meta_pk_nc.stan\n")
+
+## ────────────────────────────────────────────────────────────────
+## 2.  Build the data matrices from the three published models
+## ────────────────────────────────────────────────────────────────
+theta_hat <- rbind(
+  c(16.6, 43.2, 58,   3.1,   0.11, 0.05, 0.05),   # Luque
+  c( 6.86, 52,   NA,  NA ,   0.11, 0.02, 0.02),   # Li
+  c( 8.38, 36.4, NA,  NA ,   0.15, 0.04, 0.0367)  # DF
+)
+
+se_theta <- theta_hat * 0.10                      # use 10 % if RSE unknown
+omega_hat <- rbind(
+  c(0.225, 0.0231, 0.082, 0.582, 0, 0, 0),
+  c(0.202, 0      ,    0,     0, 0, 0, 0.024),
+  c(0.187, 0.052 ,    0, 0.022, 0, 0, 0)
+)
+
+is_obs <- !is.na(theta_hat) * 1
+theta_hat[is_obs == 0] <- 1        # dummy positive
+se_theta [is_obs == 0] <- 1
+prior_mu <- apply(theta_hat, 2, \(x) median(x, na.rm = TRUE))
+
+data_list <- list(
+  N = nrow(theta_hat),
+  K = ncol(theta_hat),
+  theta_hat = theta_hat,
+  se_theta  = log1p(se_theta / theta_hat),  # convert to log-scale SE
+  omega_hat = omega_hat,
+  is_obs    = is_obs,
+  prior_mu  = prior_mu
+)
+
+## ────────────────────────────────────────────────────────────────
+## 3.  Compile & sample
+## ────────────────────────────────────────────────────────────────
+mod <- cmdstan_model("meta_pk_nc.stan")
+
+fit <- mod$sample(
+  data            = data_list,
+  chains          = 4,
+  parallel_chains = 4,
+  iter_warmup     = 1500,
+  iter_sampling   = 4000,
+  adapt_delta     = 0.99,
+  max_treedepth   = 12
+)
+
+## ────────────────────────────────────────────────────────────────
+## 4.  Diagnostics & pooled vector
+## ────────────────────────────────────────────────────────────────
+fit$cmdstan_diagnose()            # check for divergences / depth / BFMI
+
+theta_meta <- fit$draws("theta_meta") |>
+  summarise_draws() |>
+  dplyr::filter(grepl("^theta_meta\\[", variable)) |>
+  dplyr::arrange(variable) |>
+  dplyr::pull(median)
+
+names(theta_meta) <- c("CL","VC","VP","Q","VCSF","QCSF_in","QCSF_out")
+
+cat("\nPooled (posterior-median) parameter vector:\n")
+print(theta_meta)
+
+## ────────────────────────────────────────────────────────────────
+## 5.  (Optional) write symbol-map YAML for documentation
+## ────────────────────────────────────────────────────────────────
+mapping <- list(
+  core_order  = c("CL","VC","VP","Q","VCSF","QCSF_in","QCSF_out"),
+  Luque_to_core = list(CL="TVCL", VC="TVVC", VP="TVVP", Q="TVQ",
+                       VCSF="TVVCSF", QCSF_in="TVQCSF", QCSF_out="TVQCSF"),
+  Li_to_core    = list(CL="TVCL", VC="TVVC",
+                       VCSF="TVVCSF", QCSF_in="TVQCSF", QCSF_out="TVQCSF"),
+  DF_to_core    = list(CL="TVCL", VC="TVVC",
+                       VCSF="TVVCSF", QCSF_in="TVQCSFin", QCSF_out="TVQCSFout")
+)
+write_yaml(mapping, "symbol_map.yml")
+cat("✓ wrote symbol_map.yml\n")
+
+## ================================================================
+##  End of script – you can now feed `theta_meta` into mrgsolve
+## ================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
