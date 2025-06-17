@@ -1,0 +1,332 @@
+Meta_model <- '
+$PROB
+
+$PARAM @annotated
+TVCL_Li     :  6.86    : -
+TVVC_Li     : 52       : -
+TVVP_Li     : 1        : -
+TVQ_Li      : 0        : -
+TVQCSF_Li   : 0.02     : -
+TVVCSF_Li   : 0.11     : -
+TVCLCSF_Li  : 0.008333 : -
+TVCL_Lu     : 16.6     : -
+TVVC_Lu     : 43.2     : -
+TVVP_Lu     : 58       : -
+TVQ_Lu      : 3.1      : -
+TVQCSF_Lu   : 0.05     : -
+TVVCSF_Lu   : 0.11     : -
+TVCL_DF     :  8.38    : -
+TVVC_DF     : 36.4     : -
+TVVP_DF     : 1        : -
+TVQin_DF    : 0.04     : -
+TVQout_DF   : 0.0367   : -
+TVVCSF_DF   : 0.15     : -
+TVCLEVD_DF  : 0.0102   : -
+FU_CSF      : 0.69     : -
+STUDY       : 0        : 0=Li 1=Luque 2=DF
+
+$OMEGA @diag
+0 0 0 0 0 0
+
+$SIGMA @diag
+0 0
+
+$CMT
+CENTRAL
+CSF
+PERIPHERAL
+
+$MAIN
+double CL = 0;
+double VC = 0;
+double VP = 0;
+double Q  = 0;
+double VCSF = 0;
+double Q13 = 0;
+double Q31 = 0;
+double KCSF = 0;
+
+if(STUDY==0){
+  CL   = TVCL_Li  * exp(ETA(1));
+  VC   = TVVC_Li  * exp(ETA(2));
+  VP   = TVVP_Li  * exp(ETA(3));
+  Q    = TVQ_Li   * exp(ETA(4));
+  VCSF = TVVCSF_Li* exp(ETA(5));
+  Q13  = TVQCSF_Li* exp(ETA(6));
+  Q31  = Q13*VC/VCSF;
+  KCSF = TVCLCSF_Li/VCSF;
+}
+if(STUDY==1){
+  CL   = TVCL_Lu  * exp(ETA(1));
+  VC   = TVVC_Lu  * exp(ETA(2));
+  VP   = TVVP_Lu  * exp(ETA(3));
+  Q    = TVQ_Lu   * exp(ETA(4));
+  VCSF = TVVCSF_Lu* exp(ETA(5));
+  Q13  = TVQCSF_Lu* exp(ETA(6));
+  Q31  = Q13*VC/VCSF;
+  KCSF = 0;
+}
+if(STUDY==2){
+  CL   = TVCL_DF  * exp(ETA(1));
+  VC   = TVVC_DF  * exp(ETA(2));
+  VP   = TVVP_DF  * exp(ETA(3));
+  VCSF = TVVCSF_DF* exp(ETA(4));
+  Q13  = TVQin_DF * exp(ETA(5));
+  Q31  = TVQout_DF* exp(ETA(5));
+  KCSF = TVCLEVD_DF/VCSF;
+}
+double K10 = CL/VC;
+double K12 = (Q>0 && VC>0)  ? Q/VC   : 0;
+double K21 = (Q>0 && VP>0)  ? Q/VP   : 0;
+double K13 = Q13/VC;
+double K31 = Q31/VCSF;
+
+$ODE
+dxdt_CENTRAL    = -(K10+K12+K13)*CENTRAL + K21*PERIPHERAL + K31*CSF;
+dxdt_PERIPHERAL =  K12*CENTRAL - K21*PERIPHERAL;
+dxdt_CSF        =  K13*CENTRAL - (K31+KCSF)*CSF;
+
+$TABLE
+double DV    = CENTRAL / VC;
+double DVf   = DV * FU_CSF;
+double DVCSF = CSF / VCSF;
+
+$CAPTURE DV DVf DVCSF
+'
+
+library(mrgsolve)
+mod <- mcode("Meta_LZD", Meta_model,
+             atol = 1e-8, rtol = 1e-8, maxsteps = 5000)
+
+
+
+
+
+# --- variances publiées (log-normal) --------------------------
+omega_li    <- diag(c(0.202, 0,      0,      0,       0.0422, 0.024))
+omega_luque <- diag(c(0.225, 0.0231, 0.082,  0.582,   0,      0))
+omega_df    <- diag(c(0.187, 0.052,  0,      0.02225, 0,      0.2098))
+
+# --- effectif patients (pas utile pour le poids “échantillons”)-
+n_li <- 22; n_luque <- 11; n_df <- 25
+p    <- 6   # nombre d’ETA utilisés dans le modèle
+
+# --- tirage des ETAs ------------------------------------------
+set.seed(123)
+eta_li    <- mvrnorm(n_li,     rep(0,p), omega_li)
+eta_luque <- mvrnorm(n_luque,  rep(0,p), omega_luque)
+eta_df    <- mvrnorm(n_df,     rep(0,p), omega_df)
+
+make_idata <- function(eta, study_flag, id0){
+  tibble(
+    ID   = id0 + seq_len(nrow(eta))-1,
+    STUDY= study_flag,
+    ETA1 = eta[,1], ETA2=eta[,2], ETA3=eta[,3],
+    ETA4 = eta[,4], ETA5=eta[,5], ETA6=eta[,6]
+  )
+}
+idata <- bind_rows(
+  make_idata(eta_li,    0, 1),
+  make_idata(eta_luque, 1, 1+n_li),
+  make_idata(eta_df,    2, 1+n_li+n_luque)
+)
+
+#################################################################
+## 4.  ÉVÈNEMENT posologique & SIMULATION #######################
+#################################################################
+ev1 <- ev(amt = 600, ii = 12, addl = 9)   # 600 mg perf 1 h q12h ×10 doses
+
+sim <- mod %>% 
+  idata_set(idata) %>%               # ① on colle l’idata
+  ev(ev1)            %>%             # ② on colle l’évènement
+  mrgsim(end   = 150,
+         delta = 0.25,
+         carry_out = "STUDY,ETA1,ETA2,ETA3,ETA4,ETA5,ETA6")
+
+
+#################################################################
+## 5.  Pondération par N° d’échantillons ########################
+#################################################################
+#   Nombre d’échantillons PK réels (plasma & CSF)
+w_pl  <- c(Li = 126, Luque = 46,  DF = 87)
+w_csf <- c(Li = 125, Luque = 45,  DF = 159)
+
+#   Ajout du label étude pour join rapide
+sim_df <- as_tibble(sim) %>% 
+  mutate(Model = factor(STUDY, levels = 0:2, labels = c("Li","Luque","DF")),
+         Cplasma = DVf, Ccsf = DVCSF)
+
+#   Exemple : moyenne pondérée des concentrations à chaque pas de temps
+meta_pk <- sim_df %>% 
+  group_by(time, Model) %>% 
+  summarise(Cp = median(Cplasma),
+            Cc = median(Ccsf), .groups="drop") %>% 
+  mutate(w_pl = w_pl[Model],
+         w_csf = w_csf[Model]) %>% 
+  group_by(time) %>% 
+  summarise(Cp_meta = weighted.mean(Cp,  w_pl),
+            Cc_meta = weighted.mean(Cc,  w_csf),
+            .groups="drop")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+#################################################################
+## 6.  VISUALISATION RAPIDE ####################################
+#################################################################
+
+
+my_theme <- theme_minimal(base_size = 16) +
+  theme(
+    axis.title = element_text(size = 18, color = "black"),      # Axis labels size and color
+    axis.text = element_text(size = 16, color = "black"),       # Axis ticks size and color
+    axis.line = element_line(linewidth = 1.5),                  # Axis lines size
+    legend.title = element_text(size = 18, color = "black"),    # Legend title size and color
+    legend.text = element_text(size = 16, color = "black")      # Legend text size and color
+  )
+
+
+
+
+sum_raw <- sim_df %>%                                # Li / Luque / DF
+  group_by(time, Model) %>% 
+  summarise(                                          # plasma libre DVf
+    median  = median(Cplasma),
+    lower_IQR = quantile(Cplasma, .25),
+    upper_IQR = quantile(Cplasma, .75),
+    lower_5th = quantile(Cplasma, .025),
+    upper_95th= quantile(Cplasma, .975),
+    .groups = "drop"
+  )
+
+# --- méta-modèle (déjà pondéré) ------------------------------------
+sum_meta <- meta_pk %>% 
+  transmute(time,
+            Model     = "Meta",
+            median    = Cp_meta,
+            lower_IQR = NA, upper_IQR = NA,          # on recalcule IQR/5-95
+            lower_5th = NA, upper_95th = NA)
+
+# pour se doter d’IQR & 5-95 sur le méta-modèle on reprojette
+# les mêmes poids mais en percentiles plutôt qu’en moyenne pondérée
+perc_meta <- sim_df %>% 
+  group_by(time, Model) %>% 
+  summarise(Cp = Cplasma, w = w_pl[Model], .groups="drop") %>% 
+  group_by(time) %>% 
+  summarise(                                          
+    lower_IQR = wtd.quantile(Cp, w, .25),
+    upper_IQR = wtd.quantile(Cp, w, .75),
+    lower_5th = wtd.quantile(Cp, w, .025),
+    upper_95th= wtd.quantile(Cp, w, .975),
+    .groups="drop")
+
+sum_meta <- sum_meta %>% 
+  left_join(perc_meta, by = "time", suffix = c(".raw", ".wtd")) %>% 
+  mutate(
+    lower_IQR = coalesce(lower_IQR.wtd, lower_IQR.raw),
+    upper_IQR = coalesce(upper_IQR.wtd, upper_IQR.raw),
+    lower_5th = coalesce(lower_5th.wtd, lower_5th.raw),
+    upper_95th= coalesce(upper_95th.wtd, upper_95th.raw)
+  ) %>% 
+  dplyr::select(time, Model, median,
+         lower_IQR, upper_IQR, lower_5th, upper_95th)
+# --- jeu final ------------------------------------------------------
+plot_df <- bind_rows(sum_raw, sum_meta) %>% 
+  mutate(Model = factor(Model, levels = c("Meta","Li","Luque","DF"))) %>% 
+  arrange(Model)                          # Meta passe en dernier
+
+
+jco_colors <- pal_jco()(4)          # 4 couleurs JCO
+names(jco_colors) <- levels(plot_df$Model)
+
+custom_y_scale <- scale_y_continuous(limits = c(0, 15), breaks = seq(0,15,3))
+
+## ------------------------------------------------------------------
+## 3.  Tracé ggplot
+## ------------------------------------------------------------------
+ggplot(plot_df, aes(x = time, y = median, colour = Model, fill = Model)) +
+
+  # ruban 5-95 %
+  geom_ribbon(aes(ymin = lower_5th, ymax = upper_95th),
+              alpha = 0.15, linewidth = 0, show.legend = FALSE) +
+
+  # ruban IQR
+  geom_ribbon(aes(ymin = lower_IQR, ymax = upper_IQR),
+              alpha = 0.30, linewidth = 0, show.legend = FALSE) +
+
+  # courbe médiane
+  geom_line(size = 1.4) +
+
+  scale_colour_manual(values = jco_colors) +
+  scale_fill_manual(values   = jco_colors) +
+  custom_y_scale +
+
+  labs(x = "Time (hours)",
+       y = "Free LZD concentration (mg/L)",
+       title = "Linezolid – plasma free concentrations\n3 études vs. méta-modèle") +
+
+  my_theme +
+  theme(panel.spacing = unit(1, "lines"),
+        legend.position = "top")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ggplot(meta_pk, aes(time, Cp_meta))+
+  geom_line(size=1.2, colour="blue")+
+  labs(x="Time (h)", y="Concentration libre (mg/L)",
+       title="Meta-modèle – plasma (pondéré # échantillons)")+
+  theme_minimal(base_size = 14)
+
+ggplot(meta_pk, aes(time, Cc_meta))+
+  geom_line(size=1.2, colour="darkgreen")+
+  labs(x="Time (h)", y="Concentration CSF (mg/L)",
+       title="Meta-modèle – CSF (pondéré # échantillons)")+
+  theme_minimal(base_size = 14)
