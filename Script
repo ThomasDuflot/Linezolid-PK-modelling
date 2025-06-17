@@ -478,13 +478,97 @@ DF_PTA_combined_results <- bind_rows(DF_PTA_results)
 
 
 
+##### META MODEL #####
+## ───────────────────────────────────────────────────────────────
+## 1.  Les trois modèles publiés, inchangés
+##     (copier-coller vos blocs Luque / Li / DF)
+## ───────────────────────────────────────────────────────────────
+library(mrgsolve)
+library(dplyr)
+library(ggplot2)
+library(ggsci)
 
+## blocs mrgsolve déjà compilés -----------------------------
+mod_li    <- Li_mod      # <<– ceux que vous avez créés plus haut
+mod_luque <- Luque_mod
+mod_df    <- DF_mod
 
+## ─────────────────────────────────────────────────────────────
+## 0.  Poids (échantillons) et modèles déjà compilés -----------
+## ─────────────────────────────────────────────────────────────
+w      <- c(Li = 126, Luque = 46, DF = 87)   # ← nombres d’échantillons
+models <- list(Li = mod_li, Luque = mod_luque, DF = mod_df)
 
+## ─────────────────────────────────────────────────────────────
+## 1.  Tirage des 1000 sujets  --------------------------------
+## ─────────────────────────────────────────────────────────────
+set.seed(123)
+N  <- 1000
+lab <- c("Li","Luque","DF",                          # ≥1 par modèle
+         sample(names(w), N-3, replace = TRUE, prob = w))
+lab <- sample(lab)                                   # mélange
 
+## nombre de sujets par modèle
+n_by_mod <- table(factor(lab, levels = names(models)))
 
+## ─────────────────────────────────────────────────────────────
+## 2.  Simulation (nid = n, pas de id / idata) ---------------
+## ─────────────────────────────────────────────────────────────
+dose <- ev(amt = 600, rate = 600, ii = 12, addl = 9)
 
+shift <- 0L                 # pour décaler les ID et garder unicité
+sim_list <- vector("list", length(models))
+names(sim_list) <- names(models)
 
+for(m in names(models)) {
+  n_i <- as.integer(n_by_mod[m])
+  out <- models[[m]] %>% ev(dose) %>% 
+         mrgsim(nid = n_i, end = 150, delta = .25) %>% 
+         as_tibble() %>% 
+         mutate(ID = ID + shift,     # IDs uniques
+                Group = m)
+  shift <- shift + n_i               # prochain decalage
+  sim_list[[m]] <- out
+}
+
+sim_all <- bind_rows(sim_list)
+
+## ─────────────────────────────────────────────────────────────
+## 3.  Résumés + méta-courbe  ---------------------------------
+## ─────────────────────────────────────────────────────────────
+sum_all <- sim_all %>% 
+  group_by(time, Group) %>% 
+  summarise(median  = median(DVf),
+            lIQR    = quantile(DVf, .25),
+            uIQR    = quantile(DVf, .75),
+            l95     = quantile(DVf, .05),
+            u95     = quantile(DVf, .95), .groups = "drop")
+
+meta <- sum_all %>% 
+  mutate(w = w[Group]) %>% 
+  group_by(time) %>% 
+  summarise(across(c(median,lIQR:u95), ~ weighted.mean(.x, w)),
+            .groups = "drop") %>% 
+  mutate(Group = "Meta")
+
+plot_df <- bind_rows(sum_all, meta) %>% 
+  mutate(Group = factor(Group, levels = c("Li","Luque","DF","Meta")))
+
+## ─────────────────────────────────────────────────────────────
+## 4.  Traçage  ------------------------------------------------
+## ─────────────────────────────────────────────────────────────
+cols <- setNames(pal_jco()(4), levels(plot_df$Group))
+
+ggplot(plot_df, aes(time, median, colour = Group, fill = Group)) +
+  geom_ribbon(aes(ymin = l95, ymax = u95), alpha = .15, linewidth = 0) +
+  geom_ribbon(aes(ymin = lIQR, ymax = uIQR), alpha = .30, linewidth = 0) +
+  geom_line(size = 1.2) +
+  facet_wrap(~ Group, ncol = 2, scales = "free_y") +
+  scale_colour_manual(values = cols) +
+  scale_fill_manual(values   = cols) +
+  theme_minimal(base_size = 14) +
+  labs(x = "Time (h)", y = "Free linezolid (mg/L)",
+       title = "Linezolid – 1000 simulated subjects\n(3 modèles structuraux + méta pondérée)")
 
 
 
