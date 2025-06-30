@@ -636,12 +636,12 @@ for (Luque_event_name in names(Luque_events)) {
   calc_pta_for_AUC_MIC <- function(data, MIC) {
     # Calculate the AUC/MIC ratio and determine if it is greater than 10
     Luque_pta_AUCP <- data %>%
-      mutate(AUC_MIC_P = AUCP_72_96 / MIC) %>% 
-      summarize(PTA_AUCP = mean(AUC_MIC_P > 69) * 100)  # % of patients with AUC/MIC > 100
+      mutate(AUC_MIC_P = AUCP_72_96*0.69 / MIC) %>% 
+      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 100
     
     Luque_pta_AUCCSF <- data %>%
       mutate(AUC_MIC_CSF = AUCCSF_72_96 / MIC) %>%
-      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 69) * 100)  # % of patients with AUC/MIC > 100
+      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 100
     
     return(c(PTA_AUCP = Luque_pta_AUCP$PTA_AUCP, PTA_AUCCSF = Luque_pta_AUCCSF$PTA_AUCCSF))
   }
@@ -704,12 +704,12 @@ for (Li_event_name in names(Li_events)) {
   calc_pta_for_AUC_MIC <- function(data, MIC) {
     # Calculate the AUC/MIC ratio and determine if it is greater than 10
     Li_pta_AUCP <- data %>%
-      mutate(AUC_MIC_P = AUCP_72_96 / MIC) %>% 
-      summarize(PTA_AUCP = mean(AUC_MIC_P > 69) * 100)  # % of patients with AUC/MIC > 10
+      mutate(AUC_MIC_P = AUCP_72_96*0.69 / MIC) %>% 
+      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 100
     
     Li_pta_AUCCSF <- data %>%
       mutate(AUC_MIC_CSF = AUCCSF_72_96 / MIC) %>%
-      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 69) * 100)  # % of patients with AUC/MIC > 10
+      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 100
     
     return(c(PTA_AUCP = Li_pta_AUCP$PTA_AUCP, PTA_AUCCSF = Li_pta_AUCCSF$PTA_AUCCSF))
   }
@@ -771,12 +771,12 @@ for (DF_event_name in names(DF_events)) {
   calc_pta_for_AUC_MIC <- function(data, MIC) {
     # Calculate the AUC/MIC ratio and determine if it is greater than 10
     DF_pta_AUCP <- data %>%
-      mutate(AUC_MIC_P = AUCP_72_96 / MIC) %>% 
-      summarize(PTA_AUCP = mean(AUC_MIC_P > 69) * 100)  # % of patients with AUC/MIC > 10
+      mutate(AUC_MIC_P = AUCP_72_96*0.69 / MIC) %>% 
+      summarize(PTA_AUCP = mean(AUC_MIC_P > 100) * 100)  # % of patients with AUC/MIC > 10
     
     DF_pta_AUCCSF <- data %>%
       mutate(AUC_MIC_CSF = AUCCSF_72_96 / MIC) %>%
-      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 69) * 100)  # % of patients with AUC/MIC > 10
+      summarize(PTA_AUCCSF = mean(AUC_MIC_CSF > 100) * 100)  # % of patients with AUC/MIC > 10
     
     return(c(PTA_AUCP = DF_pta_AUCP$PTA_AUCP, PTA_AUCCSF = DF_pta_AUCCSF$PTA_AUCCSF))
   }
@@ -1069,7 +1069,7 @@ combined_plot_Cmin <- ggarrange(
 
 
 # Save combined plot
-png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/Cmin_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
+png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/Cmin_Plotv2.png", width = 20, height = 12, units = 'in', res = 900)  
 print(combined_plot_Cmin)
 dev.off()
 
@@ -1445,7 +1445,7 @@ PTA_AUC_Plasma <- ggplot(combined_PTA_AUC_results  %>% filter(Model == "Li"), ae
   facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) ") +
-  ggtitle("PTA (fAUC/MIC > 69 for plasma LZD concentration)") + 
+  ggtitle("PTA (fAUC/MIC > 100 for plasma LZD concentration)") + 
   my_theme + 
   theme(
     strip.background = element_blank(),   # Clean up facet strip background
@@ -1467,7 +1467,7 @@ PTA_AUC_CSF <- ggplot(combined_PTA_AUC_results %>% filter(Model == "Li"), aes(x 
   facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) and MIC Distribution (%)") +
-  ggtitle("PTA (fAUC/MIC > 69 for CSF LZD concentration)") + 
+  ggtitle("PTA (fAUC/MIC > 100 for CSF LZD concentration)") + 
   my_theme + 
   theme(
     strip.background = element_blank(),   # Clean up facet strip background
@@ -1510,111 +1510,70 @@ combined_results_fT$MIC_Distribution <- "MIC Frequency (%)"
 # Make sure to load necessary packages and define 'my_theme' first.
 # We'll show the relevant parts focusing on the legend ordering.
 
+# PTA fT>MIC 85% – plasma
 PTA_fT_Plasma <- ggplot(combined_results_fT %>% filter(Model == "Li"), 
                         aes(x = factor(MIC))) + 
-  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution), 
-           stat = "identity", alpha = 0.5, width = 0.75) +
-  
-  geom_line(
-    data = combined_results_fT, 
-    aes(x = factor(MIC), y = PTA_DVf, group = Model, color = Model),
-    size = 1.5
-  ) +
-  geom_point(
-    data = combined_results_fT, 
-    aes(x = factor(MIC), y = PTA_DVf, shape = Model),
-    color = "black", size = 3
-  ) +
-  
+  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution),
+           stat = "identity", alpha = 0.8, width = 0.75) +
+  geom_line(data = combined_results_fT,
+            aes(x = factor(MIC), y = PTA_DVf, group = Model, color = Model),
+            size = 1.5) +
+  geom_point(data = combined_results_fT,
+             aes(x = factor(MIC), y = PTA_DVf, shape = Model),
+             color = "black", size = 3) +
   geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +
-  
-  # Set up manual fill scale for MIC frequency distribution.
-  # Assign guide = guide_legend(order = 1) so it appears first in the legend.
-  scale_fill_manual(
-    values = c("MIC Frequency (%)" = "darkgray"),
-    name = "MIC Distribution (%)"
-  ) +
-  
-  # Use JCO color scale for lines, and specify order = 2 in the legend
-  scale_color_jco(
-    name = "Model",
-    guide = guide_legend(order = 2)
-  ) +
-  
-  # Assign shapes to each model, also order = 2 to align with 'Model'
-  scale_shape_manual(
-    values = c("Li" = 16, "Luque" = 17, "DF" = 15),  # Example shapes
-    name = "Model",
-    guide = guide_legend(order = 2)
-  ) +
-
+  scale_color_jco(name = "Model") +
+  scale_fill_manual(values = c("MIC Frequency (%)" = "darkgray"), name = "") +
+  scale_shape_manual(values = c("Li" = 16, "Luque" = 17, "DF" = 15),
+                     name = "Model") +
   scale_y_continuous(name = "PTA (%)", breaks = seq(0, 100, by = 10)) +
   facet_wrap(~ Dosing, scales = "free_x") +
-  xlab("MIC (mg/L)") + 
-  ylab("PTA (%) and MIC Distribution (%)") +
-  ggtitle("PTA (fT > MIC 85% for plasma LZD concentration)") + 
-  my_theme + 
+  xlab("MIC (mg/L)") +
+  ylab("PTA (%)") +
+  ggtitle("PTA (fT > MIC 85% pour LZD plasmatique)") +
+  my_theme +
   theme(
     strip.background  = element_blank(),
     strip.placement   = "outside",
-    axis.text.y.right = element_text(color = "gray"),
-    legend.title      = element_text(size = 12),
     legend.position   = "top"
   )
 
+# PTA fT>MIC 85% – CSF
 PTA_fT_CSF <- ggplot(combined_results_fT %>% filter(Model == "Li"), 
                      aes(x = factor(MIC))) + 
-  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution), 
-           stat = "identity", alpha = 0.5, width = 0.75) +
-  
-  geom_line(
-    data = combined_results_fT, 
-    aes(x = factor(MIC), y = PTA_DVCSF, group = Model, color = Model),
-    size = 1.5
-  ) +
-  geom_point(
-    data = combined_results_fT, 
-    aes(x = factor(MIC), y = PTA_DVCSF, shape = Model),
-    color = "black", size = 3
-  ) +
-  
+  geom_bar(aes(y = Percent_Frequency, fill = MIC_Distribution),
+           stat = "identity", alpha = 0.8, width = 0.75) +
+  geom_line(data = combined_results_fT,
+            aes(x = factor(MIC), y = PTA_DVCSF, group = Model, color = Model),
+            size = 1.5) +
+  geom_point(data = combined_results_fT,
+             aes(x = factor(MIC), y = PTA_DVCSF, shape = Model),
+             color = "black", size = 3) +
   geom_hline(yintercept = 90, linetype = "dashed", color = "black", size = 1.5) +
-  
-  scale_fill_manual(
-    values = c("MIC Frequency (%)" = "darkgray"),
-    name = "MIC Distribution (%)",
-    guide = guide_legend(order = 1)
-  ) +
-  scale_color_jco(
-    name = "Model",
-    guide = guide_legend(order = 2)
-  ) +
-  scale_shape_manual(
-    values = c("Li" = 16, "Luque" = 17, "DF" = 15),
-    name = "Model",
-    guide = guide_legend(order = 2)
-  ) +
-
+  scale_color_jco(name = "Model") +
+  scale_fill_manual(values = c("MIC Frequency (%)" = "darkgray"), name = "") +
+  scale_shape_manual(values = c("Li" = 16, "Luque" = 17, "DF" = 15),
+                     name = "Model") +
   scale_y_continuous(name = "PTA (%)", breaks = seq(0, 100, by = 10)) +
   facet_wrap(~ Dosing, scales = "free_x") +
-  xlab("MIC (mg/L)") + 
-  ylab("PTA (%) and MIC Distribution (%)") +
-  ggtitle("PTA (fT > MIC 85% for CSF LZD concentration)") + 
-  my_theme + 
+  xlab("MIC (mg/L)") +
+  ylab("PTA (%)") +
+  ggtitle("PTA (fT > MIC 85% pour LZD en LCR)") +
+  my_theme +
   theme(
     strip.background  = element_blank(),
     strip.placement   = "outside",
-    axis.text.y.right = element_text(color = "gray"),
-    legend.title      = element_text(size = 12),
     legend.position   = "top"
   )
 
-
-combined_plot_PTA_fT <- ggarrange(PTA_fT_Plasma, PTA_fT_CSF, 
-                               ncol = 1, nrow = 2,  # Arrange plots vertically
-                               labels = c("A", "B"),  # Add labels to the plots (optional)
-                               common.legend = TRUE,  # Use a common legend for both plots
-                               legend = "top")  # Position the legend at the top
+# Combine panels
+combined_plot_PTA_fT <- ggarrange(
+  PTA_fT_Plasma, PTA_fT_CSF,
+  ncol = 1, nrow = 2,
+  labels = c("A", "B"),
+  common.legend = TRUE,
+  legend = "top"
+)
 
 
 png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/PTA_fT_MIC.png", 
@@ -2061,8 +2020,8 @@ plot_CFR <- function(df, plot_title) {
 # Generate individual plots
 plot_CFR_fT_Plasma <- plot_CFR(df_CFR_fT_Plasma, "CFR (fT > MIC 85% for Plasma)")
 plot_CFR_fT_CSF <- plot_CFR(df_CFR_fT_CSF, "CFR (fT > MIC 85% for CSF)")
-plot_CFR_AUC_Plasma <- plot_CFR(df_CFR_AUC_Plasma, "CFR (AUC/MIC > 69 for Plasma)")
-plot_CFR_AUC_CSF <- plot_CFR(df_CFR_AUC_CSF, "CFR (fAUC/MIC > 69 for CSF)")
+plot_CFR_AUC_Plasma <- plot_CFR(df_CFR_AUC_Plasma, "CFR (fAUC/MIC > 100 for Plasma)")
+plot_CFR_AUC_CSF <- plot_CFR(df_CFR_AUC_CSF, "CFR (fAUC/MIC > 100 for CSF)")
 
 # Arrange all plots into one figure using ggarrange()
 combined_CFR_plot <- ggarrange(
