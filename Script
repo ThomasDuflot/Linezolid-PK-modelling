@@ -8,7 +8,7 @@ library(officer)
 library(tidyr)
 library(reshape2)
 
-setwd("C:/Users/duflo/OneDrive/Bureau/LZD/V3")
+setwd("C:/Users/thomas.duflot/Desktop/LZD")
 set.seed(123)
 
 my_theme <- theme_minimal(base_size = 16) +
@@ -1013,7 +1013,7 @@ combined_plot_AUC <- ggarrange(
 )
 
 # Save combined plot
-png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/AUC_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
+png("C:/Users/thomas.duflot/Desktop/LZD/AUC_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
 print(combined_plot_AUC)
 dev.off()
 
@@ -1069,7 +1069,7 @@ combined_plot_Cmin <- ggarrange(
 
 
 # Save combined plot
-png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/Cmin_Plotv2.png", width = 20, height = 12, units = 'in', res = 900)  
+png("C:/Users/thomas.duflot/Desktop/LZD/Cmin_Plotv2.png", width = 20, height = 12, units = 'in', res = 900)  
 print(combined_plot_Cmin)
 dev.off()
 
@@ -1326,7 +1326,7 @@ combined_plot_Sim <- ggarrange(
 
 print(combined_plot_Sim)
 
-png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/Sim_Plot.png", width = 24, height = 12, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/thomas.duflot/Desktop/LZD/Sim_Plot.png", width = 24, height = 12, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_Sim)
@@ -1486,7 +1486,7 @@ combined_plot_PTA <- ggarrange(PTA_AUC_Plasma, PTA_AUC_CSF,
 
 
 
-png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/PTA_AUC_Plot_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/thomas.duflot/Desktop/LZD/PTA_AUC_Plot_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_PTA)
@@ -1576,7 +1576,7 @@ combined_plot_PTA_fT <- ggarrange(
 )
 
 
-png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/PTA_fT_MIC.png", 
+png("C:/Users/thomas.duflot/Desktop/LZD/PTA_fT_MIC.png", 
     width = 12, height = 16, units = 'in', res = 900)
 print(combined_plot_PTA_fT)
 dev.off()
@@ -1730,7 +1730,7 @@ print(MIC_Distrib)
 
 
 
-png("C:/Users/duflo/OneDrive/Bureau/LZD/V2/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/thomas.duflot/Desktop/LZD/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 print(MIC_Distrib)
 dev.off()
 
@@ -2036,7 +2036,7 @@ combined_CFR_plot <- ggarrange(
 print(combined_CFR_plot)
 
 # Save as PNG
-png("CFR_Combined_Plot.png", width = 16, height = 12, units = "in", res = 300)
+png("C:/Users/thomas.duflot/Desktop/LZD/CFR_Combined_Plot.png", width = 16, height = 12, units = "in", res = 300)
 print(combined_CFR_plot)
 dev.off()
 
