@@ -1,0 +1,517 @@
+## ============================================
+## DF model – weight scenarios (50–130 kg)
+## ============================================
+
+weights_vec <- c(50, 70, 90, 110, 130)
+n_ind_per_wt <- 1000   # number of individuals per weight
+
+## idata with one covariate WT per subject
+DF_idata <- expand.grid(
+  WT  = weights_vec,
+  rep = 1:n_ind_per_wt
+) %>%
+  arrange(WT, rep) %>%
+  mutate(ID = dplyr::row_number()) %>%
+  select(ID, WT)
+
+## Make sure Dosing factor has the right order
+dosing_levels <- c("600q12h", "600q8h", "600q6h",
+                   "1200q24hCI", "1800q24hCI", "2400q24hCI")
+
+DF_wt_results <- vector("list", length(DF_events))
+names(DF_wt_results) <- names(DF_events)
+
+for (ev_name in names(DF_events)) {
+  DF_out <- DF_mod %>%
+    ev(DF_events[[ev_name]]) %>%
+    mrgsim(idata = DF_idata, delta = 0.1, end = 96, obsonly = TRUE)
+  
+  DF_wt_results[[ev_name]] <- as.data.frame(DF_out) %>%
+    left_join(DF_idata, by = "ID") %>%
+    mutate(
+      Dosing = factor(ev_name, levels = dosing_levels)
+    )
+}
+
+## All DF simulations with weight as covariate
+DF_wt_sim <- bind_rows(DF_wt_results) %>%
+  mutate(
+    WT = factor(WT, levels = weights_vec,
+                labels = paste0(weights_vec, " kg"))
+  )
+
+
+## ============================================
+## Steady-state Cmin & AUC (72–96 h)
+## ============================================
+
+DF_wt_ss <- DF_wt_sim %>%
+  filter(time >= 72, time <= 96) %>%
+  group_by(Dosing, WT, ID) %>%
+  summarise(
+    min_DVf      = min(DVf,    na.rm = TRUE),
+    min_DVCSF    = min(DVCSF,  na.rm = TRUE),
+    AUCP_72_96   = max(AUCP,   na.rm = TRUE) - min(AUCP,   na.rm = TRUE),
+    AUCCSF_72_96 = max(AUCCSF, na.rm = TRUE) - min(AUCCSF, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # avoid 0 on log scale
+    min_DVf   = ifelse(min_DVf   == 0, 0.01, min_DVf),
+    min_DVCSF = ifelse(min_DVCSF == 0, 0.01, min_DVCSF)
+  )
+
+
+
+
+## ============================================
+## AUC plots – DF model by weight
+## ============================================
+
+custom_breaks_auc <- c(10, 30, 50, 100, 300, 500, 1000)
+y_limits_auc      <- c(10, 1000)
+
+# Plasma AUC
+DF_AUC_Plasma_wt <- ggplot(DF_wt_ss,
+                           aes(x = Dosing,
+                               y = AUCP_72_96,
+                               fill = WT)) +
+  geom_violin(position = position_dodge(width = 0.85),
+              alpha = 0.3, color = "black", linewidth = 1.5) +
+  geom_boxplot(width = 0.2,
+               position = position_dodge(width = 0.85),
+               alpha = 0.7,
+               outlier.shape = NA,
+               color = "black", linewidth = 1.2) +
+  labs(
+    title = "DF model – Plasma fAUC according to dosing regimen and weight",
+    x = "Dosing regimen",
+    y = "Plasma fAUC 72–96 h (mg·h/L)"
+  ) +
+  scale_fill_jco(name = "Weight") +
+  scale_y_log10(breaks = custom_breaks_auc,
+                limits = y_limits_auc,
+                labels = scales::comma_format()) +
+  my_theme
+
+# CSF AUC
+DF_AUC_CSF_wt <- ggplot(DF_wt_ss,
+                        aes(x = Dosing,
+                            y = AUCCSF_72_96,
+                            fill = WT)) +
+  geom_violin(position = position_dodge(width = 0.85),
+              alpha = 0.3, color = "black", linewidth = 1.5) +
+  geom_boxplot(width = 0.2,
+               position = position_dodge(width = 0.85),
+               alpha = 0.7,
+               outlier.shape = NA,
+               color = "black", linewidth = 1.2) +
+  labs(
+    title = "DF model – CSF AUC according to dosing regimen and weight",
+    x = "Dosing regimen",
+    y = "CSF AUC 72–96 h (mg·h/L)"
+  ) +
+  scale_fill_jco(name = "Weight") +
+  scale_y_log10(breaks = custom_breaks_auc,
+                limits = y_limits_auc,
+                labels = scales::comma_format()) +
+  my_theme
+
+DF_AUC_plot <- ggarrange(
+  DF_AUC_Plasma_wt,
+  DF_AUC_CSF_wt,
+  ncol = 1, nrow = 2,
+  labels = c("A", "B"),
+  common.legend = TRUE,
+  legend = "top"
+)
+
+# Adapt the path to your system
+png("C:/Users/thomas.duflot/Desktop/LZD/DF_AUC_Weight_Plot.png",
+    width = 20, height = 12, units = "in", res = 900)
+print(DF_AUC_plot)
+dev.off()
+
+
+
+## ============================================
+## Cmin plots – DF model by weight
+## ============================================
+
+custom_breaks_cmin <- c(0.1, 0.3, 0.5, 1, 3, 5, 10, 30, 50)
+y_limits_cmin      <- c(0.01, 50)
+
+# Plasma Cmin
+DF_Cmin_Plasma_wt <- ggplot(DF_wt_ss,
+                            aes(x = Dosing,
+                                y = min_DVf,
+                                fill = WT)) +
+  geom_violin(position = position_dodge(width = 0.85),
+              alpha = 0.3, color = "black", linewidth = 1.5) +
+  geom_boxplot(width = 0.2,
+               position = position_dodge(width = 0.85),
+               alpha = 0.7,
+               outlier.shape = NA,
+               color = "black", linewidth = 1.2) +
+  labs(
+    title = "DF model – Plasma Cmin according to dosing regimen and weight",
+    x = "Dosing regimen",
+    y = "Plasma Cmin 72–96 h (mg/L)"
+  ) +
+  scale_fill_jco(name = "Weight") +
+  scale_y_log10(breaks = custom_breaks_cmin,
+                limits = y_limits_cmin,
+                labels = scales::comma_format()) +
+  my_theme
+
+# CSF Cmin
+DF_Cmin_CSF_wt <- ggplot(DF_wt_ss,
+                         aes(x = Dosing,
+                             y = min_DVCSF,
+                             fill = WT)) +
+  geom_violin(position = position_dodge(width = 0.85),
+              alpha = 0.3, color = "black", linewidth = 1.5) +
+  geom_boxplot(width = 0.2,
+               position = position_dodge(width = 0.85),
+               alpha = 0.7,
+               outlier.shape = NA,
+               color = "black", linewidth = 1.2) +
+  labs(
+    title = "DF model – CSF Cmin according to dosing regimen and weight",
+    x = "Dosing regimen",
+    y = "CSF Cmin 72–96 h (mg/L)"
+  ) +
+  scale_fill_jco(name = "Weight") +
+  scale_y_log10(breaks = custom_breaks_cmin,
+                limits = y_limits_cmin,
+                labels = scales::comma_format()) +
+  my_theme
+
+DF_Cmin_plot <- ggarrange(
+  DF_Cmin_Plasma_wt,
+  DF_Cmin_CSF_wt,
+  ncol = 1, nrow = 2,
+  labels = c("A", "B"),
+  common.legend = TRUE,
+  legend = "top"
+)
+
+png("C:/Users/thomas.duflot/Desktop/LZD/DF_Cmin_Weight_Plot.png",
+    width = 20, height = 12, units = "in", res = 900)
+print(DF_Cmin_plot)
+dev.off()
+
+
+
+
+## ============================================
+## PK profiles in plasma – DF model by weight
+## ============================================
+
+DF_profile_plasma <- DF_wt_sim %>%
+  group_by(Dosing, WT, time) %>%
+  summarise(
+    median_DVf  = median(DVf, na.rm = TRUE),
+    lower_IQR   = quantile(DVf, 0.25, na.rm = TRUE),
+    upper_IQR   = quantile(DVf, 0.75, na.rm = TRUE),
+    lower_5th   = quantile(DVf, 0.05, na.rm = TRUE),
+    upper_95th  = quantile(DVf, 0.95, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+DF_PK_Plasma <- DF_profile_plasma %>%
+  ggplot(aes(x = time,
+             y = median_DVf,
+             colour = WT)) +
+  geom_line(size = 1.2) +
+  facet_wrap(~ Dosing, scales = "free_x") +
+  scale_colour_jco(name = "Weight") +
+  xlab("Time (hours)") +
+  ylab("Free linezolid in plasma (mg/L)") +
+  ggtitle("DF model – LZD PK profile in plasma by weight") +
+  my_theme +
+  theme(panel.spacing.x = unit(2, "lines"),
+        panel.spacing.y = unit(1, "lines"))
+
+png("C:/Users/thomas.duflot/Desktop/LZD/DF_PK_Plasma_Weight.png",
+    width = 20, height = 10, units = "in", res = 900)
+print(DF_PK_Plasma)
+dev.off()
+
+
+
+## ============================================
+## PK profiles in CSF – DF model by weight
+## ============================================
+
+DF_profile_csf <- DF_wt_sim %>%
+  group_by(Dosing, WT, time) %>%
+  summarise(
+    median_DVCSF = median(DVCSF, na.rm = TRUE),
+    lower_IQR    = quantile(DVCSF, 0.25, na.rm = TRUE),
+    upper_IQR    = quantile(DVCSF, 0.75, na.rm = TRUE),
+    lower_5th    = quantile(DVCSF, 0.05, na.rm = TRUE),
+    upper_95th   = quantile(DVCSF, 0.95, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+DF_PK_CSF <- DF_profile_csf %>%
+  ggplot(aes(x = time,
+             y = median_DVCSF,
+             colour = WT)) +
+  geom_line(size = 1.2) +
+  facet_wrap(~ Dosing, scales = "free_x") +
+  scale_colour_jco(name = "Weight") +
+  xlab("Time (hours)") +
+  ylab("Linezolid in CSF (mg/L)") +
+  ggtitle("DF model – LZD PK profile in CSF by weight") +
+  my_theme +
+  theme(panel.spacing.x = unit(2, "lines"),
+        panel.spacing.y = unit(1, "lines"))
+
+png("C:/Users/thomas.duflot/Desktop/LZD/DF_PK_CSF_Weight.png",
+    width = 20, height = 10, units = "in", res = 900)
+print(DF_PK_CSF)
+dev.off()
+
+
+
+
+
+
+## ============================================
+## PTA by weight – DF model
+## ============================================
+
+# Same MIC values as before
+MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)
+
+# Target AUC/MIC threshold (can change if needed)
+target_AUC_MIC <- 100
+
+
+## --------------------------------------------
+## 6.1 fT>MIC PTA by weight (Plasma + CSF)
+## --------------------------------------------
+
+DF_wt_72_96 <- DF_wt_sim %>%
+  filter(time >= 72, time <= 96)
+
+PTA_fT_list <- list()
+
+for (mic in MIC_values) {
+  tmp <- DF_wt_72_96 %>%
+    group_by(WT, Dosing, ID) %>%
+    summarise(
+      prop_above_MIC_DVf   = mean(DVf   >= mic, na.rm = TRUE),
+      prop_above_MIC_DVCSF = mean(DVCSF >= mic, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    group_by(WT, Dosing) %>%
+    summarise(
+      PTA_fT_DVf   = mean(prop_above_MIC_DVf   >= 0.85) * 100,
+      PTA_fT_DVCSF = mean(prop_above_MIC_DVCSF >= 0.85) * 100,
+      .groups = "drop"
+    ) %>%
+    mutate(MIC = mic)
+  
+  PTA_fT_list[[as.character(mic)]] <- tmp
+}
+
+DF_PTA_fT_weight <- bind_rows(PTA_fT_list)
+
+## --------------------------------------------
+## 6.2 AUC/MIC>100 PTA by weight (Plasma + CSF)
+## --------------------------------------------
+
+PTA_AUC_list <- list()
+
+for (mic in MIC_values) {
+  tmp <- DF_wt_ss %>%
+    group_by(WT, Dosing) %>%
+    summarise(
+      PTA_AUC_DVf   = mean((AUCP_72_96   / mic) >= target_AUC_MIC) * 100,
+      PTA_AUC_DVCSF = mean((AUCCSF_72_96 / mic) >= target_AUC_MIC) * 100,
+      .groups = "drop"
+    ) %>%
+    mutate(MIC = mic)
+  
+  PTA_AUC_list[[as.character(mic)]] <- tmp
+}
+
+DF_PTA_AUC_weight <- bind_rows(PTA_AUC_list)
+
+
+
+
+
+
+DF_PTA_fT_plasma_plot <- DF_PTA_fT_weight %>%
+  ggplot(aes(x = factor(MIC),
+             y = PTA_fT_DVf,
+             group = WT,
+             colour = WT)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  ggh4x::facet_wrap2(~ Dosing, axes = "all")+
+  scale_colour_jco(name = "Weight") +
+  ylim(0, 100) +
+  xlab("MIC (mg/L)") +
+  ylab("PTA (%) – fT>MIC (Plasma)") +
+  ggtitle("DF model – PTA fT>MIC in plasma by weight and dosing regimen") +
+  my_theme
+
+png("C:/Users/thomas.duflot/Desktop/LZD/DF_PTA_fT_Plasma_Weight.png",
+    width = 20, height = 10, units = "in", res = 900)
+print(DF_PTA_fT_plasma_plot)
+dev.off()
+
+
+
+
+
+
+
+DF_PTA_fT_csf_plot <- DF_PTA_fT_weight %>%
+  ggplot(aes(x = factor(MIC),
+             y = PTA_fT_DVCSF,
+             group = WT,
+             colour = WT)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  ggh4x::facet_wrap2(~ Dosing, axes = "all")+
+  scale_colour_jco(name = "Weight") +
+  ylim(0, 100) +
+  xlab("MIC (mg/L)") +
+  ylab("PTA (%) – fT>MIC (CSF)") +
+  ggtitle("DF model – PTA fT>MIC in CSF by weight and dosing regimen") +
+  my_theme
+
+png("C:/Users/thomas.duflot/Desktop/LZD/DF_PTA_fT_CSF_Weight.png",
+    width = 20, height = 10, units = "in", res = 900)
+print(DF_PTA_fT_csf_plot)
+dev.off()
+
+
+
+
+
+DF_PTA_AUC_plasma_plot <- DF_PTA_AUC_weight %>%
+  ggplot(aes(x = factor(MIC),
+             y = PTA_AUC_DVf,
+             group = WT,
+             colour = WT)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  ggh4x::facet_wrap2(~ Dosing, axes = "all") +
+  scale_colour_jco(name = "Weight") +
+  ylim(0, 100) +
+  xlab("MIC (mg/L)") +
+  ylab(paste0("PTA (%) – AUC/MIC ≥ ", target_AUC_MIC, " (Plasma)")) +
+  ggtitle("DF model – PTA AUC/MIC in plasma by weight and dosing regimen") +
+  my_theme
+
+png("C:/Users/thomas.duflot/Desktop/LZD/DF_PTA_AUC_Plasma_Weight.png",
+    width = 20, height = 10, units = "in", res = 900)
+print(DF_PTA_AUC_plasma_plot)
+dev.off()
+
+
+
+
+
+DF_PTA_AUC_csf_plot <- DF_PTA_AUC_weight %>%
+  ggplot(aes(x = factor(MIC),
+             y = PTA_AUC_DVCSF,
+             group = WT,
+             colour = WT)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  ggh4x::facet_wrap2(~ Dosing, axes = "all")+
+  scale_colour_jco(name = "Weight") +
+  ylim(0, 100) +
+  xlab("MIC (mg/L)") +
+  ylab(paste0("PTA (%) – AUC/MIC ≥ ", target_AUC_MIC, " (CSF)")) +
+  ggtitle("DF model – PTA AUC/MIC in CSF by weight and dosing regimen") +
+  my_theme
+
+png("C:/Users/thomas.duflot/Desktop/LZD/DF_PTA_AUC_CSF_Weight.png",
+    width = 20, height = 10, units = "in", res = 900)
+print(DF_PTA_AUC_csf_plot)
+dev.off()
+
+
+
+## ============================================
+## Combine PTA metrics by weight into one table
+## ============================================
+
+# Join fT>MIC PTA and AUC/MIC PTA
+DF_PTA_weight_table <- DF_PTA_fT_weight %>%
+  left_join(
+    DF_PTA_AUC_weight,
+    by = c("WT", "Dosing", "MIC")
+  ) %>%
+  arrange(Dosing, WT, MIC) %>%
+  mutate(
+    PTA_fT_DVf   = round(PTA_fT_DVf,   1),
+    PTA_fT_DVCSF = round(PTA_fT_DVCSF, 1),
+    PTA_AUC_DVf  = round(PTA_AUC_DVf,  1),
+    PTA_AUC_DVCSF= round(PTA_AUC_DVCSF,1)
+  )
+
+# Optional: rename for nicer column titles
+DF_PTA_weight_table <- DF_PTA_weight_table %>%
+  rename(
+    `PTA fT>MIC Plasma (%)`            = PTA_fT_DVf,
+    `PTA fT>MIC CSF (%)`               = PTA_fT_DVCSF,
+    `PTA AUC/MIC≥100 Plasma (%)`       = PTA_AUC_DVf,
+    `PTA AUC/MIC≥100 CSF (%)`          = PTA_AUC_DVCSF
+  )
+
+## ============================================
+## Flextable + Word export
+## ============================================
+
+ft_DF_PTA_weight <- DF_PTA_weight_table %>%
+  flextable() %>%
+  set_header_labels(
+    WT  = "Weight",
+    Dosing = "Dosing regimen",
+    MIC = "MIC (mg/L)",
+    `PTA fT>MIC Plasma (%)`      = "Plasma",
+    `PTA fT>MIC CSF (%)`         = "CSF",
+    `PTA AUC/MIC≥100 Plasma (%)` = "Plasma",
+    `PTA AUC/MIC≥100 CSF (%)`    = "CSF"
+  ) %>%
+  # Add a grouped header row
+  add_header_row(
+    values = c(
+      "Weight", "Dosing regimen", "MIC (mg/L)",
+      "PTA fT>MIC (≥85% of time 72–96 h)",
+      paste0("PTA AUC/MIC ≥ ", target_AUC_MIC, " (72–96 h)")
+    ),
+    colwidths = c(1, 1, 1, 2, 2)
+  ) %>%
+  merge_h(part = "header") %>%
+  merge_v(j = c("WT", "Dosing")) %>%  # merge identical WT & dosing downwards
+  align(j = c("WT", "Dosing", "MIC"), align = "center", part = "all") %>%
+  autofit() %>%
+  fontsize(size = 9, part = "all")
+
+# Export to Word
+doc <- read_docx() %>%
+  body_add_par("DF model – PTA by weight", style = "heading 1") %>%
+  body_add_flextable(ft_DF_PTA_weight)
+
+print(doc, target = "DF_PTA_Weight_Table.docx")
+
+
+
+
+
+
+
+
+
+
