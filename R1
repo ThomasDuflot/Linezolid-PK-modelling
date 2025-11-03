@@ -508,10 +508,573 @@ print(doc, target = "DF_PTA_Weight_Table.docx")
 
 
 
+library(dplyr)
+library(ggplot2)
+library(ggh4x)
+library(ggsci)
+
+## ------------------------------------------------
+## Li model – CrCl scenarios
+## ------------------------------------------------
+
+# Output folder (adapt if needed)
+out_dir <- "C:/Users/thomas.duflot/Desktop/LZD"
+
+# Creatinine clearance scenarios
+CrCl_vec <- c(45, 90, 120, 150, 200,250)
+n_ind_per_CrCl <- 1000
+
+# idata: each subject has a CrCl and a (fixed) PCT
+Li_idata <- expand.grid(
+  CrCl = CrCl_vec,
+  rep  = 1:n_ind_per_CrCl
+) %>%
+  arrange(CrCl, rep) %>%
+  mutate(
+    ID  = dplyr::row_number(),
+    PCT = 0.14      # typical PCT from your model
+  ) %>%
+  select(ID, CrCl, PCT)
+
+# Make sure dosing factor is ordered
+dosing_levels <- c("600q12h", "600q8h", "600q6h",
+                   "1200q24hCI", "1800q24hCI", "2400q24hCI")
+
+Li_CrCl_results <- vector("list", length(Li_events))
+names(Li_CrCl_results) <- names(Li_events)
+
+for (ev_name in names(Li_events)) {
+  Li_out <- Li_mod %>%
+    ev(Li_events[[ev_name]]) %>%
+    mrgsim(idata = Li_idata,
+           delta = 0.1,
+           end = 96,
+           obsonly = TRUE)
+
+  Li_CrCl_results[[ev_name]] <- as.data.frame(Li_out) %>%
+    left_join(Li_idata, by = "ID") %>%
+    mutate(
+      Dosing = factor(ev_name, levels = dosing_levels)
+    )
+}
+
+# All Li simulations with CrCl as covariate
+Li_CrCl_sim <- bind_rows(Li_CrCl_results) %>%
+  mutate(
+    CrCl = factor(CrCl,
+                  levels = CrCl_vec,
+                  labels = paste0(CrCl_vec, " mL/min"))
+  )
 
 
 
 
 
+## ------------------------------------------------
+## Steady-state (72–96 h) – Li + CrCl
+## ------------------------------------------------
+
+Li_CrCl_ss <- Li_CrCl_sim %>%
+  filter(time >= 72, time <= 96) %>%
+  group_by(Dosing, CrCl, ID) %>%
+  summarise(
+    min_DVf      = min(DVf,    na.rm = TRUE),
+    min_DVCSF    = min(DVCSF,  na.rm = TRUE),
+    AUCP_72_96   = max(AUCP,   na.rm = TRUE) - min(AUCP,   na.rm = TRUE),
+    AUCCSF_72_96 = max(AUCCSF, na.rm = TRUE) - min(AUCCSF, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    # avoid zero on log scales if you later plot Cmin
+    min_DVf   = ifelse(min_DVf   == 0, 0.01, min_DVf),
+    min_DVCSF = ifelse(min_DVCSF == 0, 0.01, min_DVCSF)
+  )
+
+
+
+## ------------------------------------------------
+## PTA by CrCl – Li model
+## ------------------------------------------------
+
+MIC_values <- c(0.25, 0.5, 1, 2, 4, 8, 16, 32)
+target_AUC_MIC <- 100
+
+## 3.1 fT>MIC PTA by CrCl (Plasma + CSF)
+
+Li_CrCl_72_96 <- Li_CrCl_sim %>%
+  filter(time >= 72, time <= 96)
+
+PTA_fT_list_Li <- list()
+
+for (mic in MIC_values) {
+  tmp <- Li_CrCl_72_96 %>%
+    group_by(CrCl, Dosing, ID) %>%
+    summarise(
+      prop_above_MIC_DVf   = mean(DVf   >= mic, na.rm = TRUE),
+      prop_above_MIC_DVCSF = mean(DVCSF >= mic, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    group_by(CrCl, Dosing) %>%
+    summarise(
+      PTA_fT_DVf   = mean(prop_above_MIC_DVf   >= 0.85) * 100,
+      PTA_fT_DVCSF = mean(prop_above_MIC_DVCSF >= 0.85) * 100,
+      .groups = "drop"
+    ) %>%
+    mutate(MIC = mic)
+
+  PTA_fT_list_Li[[as.character(mic)]] <- tmp
+}
+
+Li_PTA_fT_CrCl <- bind_rows(PTA_fT_list_Li)
+
+## 3.2 AUC/MIC≥100 PTA by CrCl (Plasma + CSF)
+
+PTA_AUC_list_Li <- list()
+
+for (mic in MIC_values) {
+  tmp <- Li_CrCl_ss %>%
+    group_by(CrCl, Dosing) %>%
+    summarise(
+      PTA_AUC_DVf   = mean((AUCP_72_96   / mic) >= target_AUC_MIC) * 100,
+      PTA_AUC_DVCSF = mean((AUCCSF_72_96 / mic) >= target_AUC_MIC) * 100,
+      .groups = "drop"
+    ) %>%
+    mutate(MIC = mic)
+
+  PTA_AUC_list_Li[[as.character(mic)]] <- tmp
+}
+
+Li_PTA_AUC_CrCl <- bind_rows(PTA_AUC_list_Li)
+
+
+
+
+Li_PTA_fT_plasma_plot <- Li_PTA_fT_CrCl %>%
+  ggplot(aes(x = factor(MIC),
+             y = PTA_fT_DVf,
+             group = CrCl,
+             colour = CrCl)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  ggh4x::facet_wrap2(~ Dosing, axes = "all") +
+  scale_colour_jco(name = "CrCl") +
+  ylim(0, 100) +
+  xlab("MIC (mg/L)") +
+  ylab("PTA (%) – fT>MIC (Plasma)") +
+  ggtitle("Li model – PTA fT>MIC in plasma by CrCl and dosing regimen") +
+  my_theme
+
+png(file.path(out_dir, "Li_PTA_fT_Plasma_CrCl.png"),
+    width = 20, height = 10, units = "in", res = 900)
+print(Li_PTA_fT_plasma_plot)
+dev.off()
+
+
+
+Li_PTA_fT_csf_plot <- Li_PTA_fT_CrCl %>%
+  ggplot(aes(x = factor(MIC),
+             y = PTA_fT_DVCSF,
+             group = CrCl,
+             colour = CrCl)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  ggh4x::facet_wrap2(~ Dosing, axes = "all") +
+  scale_colour_jco(name = "CrCl") +
+  ylim(0, 100) +
+  xlab("MIC (mg/L)") +
+  ylab("PTA (%) – fT>MIC (CSF)") +
+  ggtitle("Li model – PTA fT>MIC in CSF by CrCl and dosing regimen") +
+  my_theme
+
+png(file.path(out_dir, "Li_PTA_fT_CSF_CrCl.png"),
+    width = 20, height = 10, units = "in", res = 900)
+print(Li_PTA_fT_csf_plot)
+dev.off()
+
+
+
+Li_PTA_AUC_plasma_plot <- Li_PTA_AUC_CrCl %>%
+  ggplot(aes(x = factor(MIC),
+             y = PTA_AUC_DVf,
+             group = CrCl,
+             colour = CrCl)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  ggh4x::facet_wrap2(~ Dosing, axes = "all") +
+  scale_colour_jco(name = "CrCl") +
+  ylim(0, 100) +
+  xlab("MIC (mg/L)") +
+  ylab(paste0("PTA (%) – AUC/MIC ≥ ", target_AUC_MIC, " (Plasma)")) +
+  ggtitle("Li model – PTA AUC/MIC in plasma by CrCl and dosing regimen") +
+  my_theme
+
+png(file.path(out_dir, "Li_PTA_AUC_Plasma_CrCl.png"),
+    width = 20, height = 10, units = "in", res = 900)
+print(Li_PTA_AUC_plasma_plot)
+dev.off()
+
+
+
+
+Li_PTA_AUC_csf_plot <- Li_PTA_AUC_CrCl %>%
+  ggplot(aes(x = factor(MIC),
+             y = PTA_AUC_DVCSF,
+             group = CrCl,
+             colour = CrCl)) +
+  geom_line(linewidth = 1.2) +
+  geom_point(size = 2) +
+  ggh4x::facet_wrap2(~ Dosing, axes = "all") +
+  scale_colour_jco(name = "CrCl") +
+  ylim(0, 100) +
+  xlab("MIC (mg/L)") +
+  ylab(paste0("PTA (%) – AUC/MIC ≥ ", target_AUC_MIC, " (CSF)")) +
+  ggtitle("Li model – PTA AUC/MIC in CSF by CrCl and dosing regimen") +
+  my_theme
+
+png(file.path(out_dir, "Li_PTA_AUC_CSF_CrCl.png"),
+    width = 20, height = 10, units = "in", res = 900)
+print(Li_PTA_AUC_csf_plot)
+dev.off()
+
+
+
+
+
+## ------------------------------------------------
+## Steady-state (72–96 h) – Li + CrCl
+## ------------------------------------------------
+
+Li_CrCl_ss <- Li_CrCl_sim %>%
+  dplyr::filter(time >= 72, time <= 96) %>%
+  dplyr::group_by(Dosing, CrCl, ID) %>%
+  dplyr::summarise(
+    min_DVf      = min(DVf,    na.rm = TRUE),
+    min_DVCSF    = min(DVCSF,  na.rm = TRUE),
+    AUCP_72_96   = max(AUCP,   na.rm = TRUE) - min(AUCP,   na.rm = TRUE),
+    AUCCSF_72_96 = max(AUCCSF, na.rm = TRUE) - min(AUCCSF, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  dplyr::mutate(
+    # Avoid 0 on log scale if you plot later
+    min_DVf   = ifelse(min_DVf   == 0, 0.01, min_DVf),
+    min_DVCSF = ifelse(min_DVCSF == 0, 0.01, min_DVCSF)
+  )
+
+
+
+
+## ------------------------------------------------
+## AUC plots – Li model by CrCl
+## ------------------------------------------------
+
+custom_breaks_auc <- c(10, 30, 50, 100, 300, 500, 1000,2000)
+y_limits_auc      <- c(10, 2000)
+
+# Plasma AUC
+Li_AUC_Plasma_CrCl <- ggplot(Li_CrCl_ss,
+                             aes(x = Dosing,
+                                 y = AUCP_72_96,
+                                 fill = CrCl)) +
+  geom_violin(position = position_dodge(width = 0.85),
+              alpha = 0.3, color = "black", linewidth = 1.5) +
+  geom_boxplot(width = 0.2,
+               position = position_dodge(width = 0.85),
+               alpha = 0.7,
+               outlier.shape = NA,
+               color = "black", linewidth = 1.2) +
+  labs(
+    title = "Li model – Plasma fAUC according to dosing regimen and CrCl",
+    x = "Dosing regimen",
+    y = "Plasma fAUC 72–96 h (mg·h/L)"
+  ) +
+  scale_fill_jco(name = "CrCl") +
+  scale_y_log10(breaks = custom_breaks_auc,
+                limits = y_limits_auc,
+                labels = scales::comma_format()) +
+  my_theme
+
+# CSF AUC
+Li_AUC_CSF_CrCl <- ggplot(Li_CrCl_ss,
+                          aes(x = Dosing,
+                              y = AUCCSF_72_96,
+                              fill = CrCl)) +
+  geom_violin(position = position_dodge(width = 0.85),
+              alpha = 0.3, color = "black", linewidth = 1.5) +
+  geom_boxplot(width = 0.2,
+               position = position_dodge(width = 0.85),
+               alpha = 0.7,
+               outlier.shape = NA,
+               color = "black", linewidth = 1.2) +
+  labs(
+    title = "Li model – CSF AUC according to dosing regimen and CrCl",
+    x = "Dosing regimen",
+    y = "CSF AUC 72–96 h (mg·h/L)"
+  ) +
+  scale_fill_jco(name = "CrCl") +
+  scale_y_log10(breaks = custom_breaks_auc,
+                limits = y_limits_auc,
+                labels = scales::comma_format()) +
+  my_theme
+
+Li_AUC_plot <- ggpubr::ggarrange(
+  Li_AUC_Plasma_CrCl,
+  Li_AUC_CSF_CrCl,
+  ncol = 1, nrow = 2,
+  labels = c("A", "B"),
+  common.legend = TRUE,
+  legend = "top"
+)
+
+png(file.path(out_dir, "Li_AUC_CrCl_Plot.png"),
+    width = 20, height = 12, units = "in", res = 900)
+print(Li_AUC_plot)
+dev.off()
+
+
+
+## ------------------------------------------------
+## Cmin plots – Li model by CrCl
+## ------------------------------------------------
+
+custom_breaks_cmin <- c(0.1, 0.3, 0.5, 1, 3, 5, 10, 30, 50,70)
+y_limits_cmin      <- c(0.01, 70)
+
+# Plasma Cmin
+Li_Cmin_Plasma_CrCl <- ggplot(Li_CrCl_ss,
+                              aes(x = Dosing,
+                                  y = min_DVf,
+                                  fill = CrCl)) +
+  geom_violin(position = position_dodge(width = 0.85),
+              alpha = 0.3, color = "black", linewidth = 1.5) +
+  geom_boxplot(width = 0.2,
+               position = position_dodge(width = 0.85),
+               alpha = 0.7,
+               outlier.shape = NA,
+               color = "black", linewidth = 1.2) +
+  labs(
+    title = "Li model – Plasma Cmin according to dosing regimen and CrCl",
+    x = "Dosing regimen",
+    y = "Plasma Cmin 72–96 h (mg/L)"
+  ) +
+  scale_fill_jco(name = "CrCl") +
+  scale_y_log10(breaks = custom_breaks_cmin,
+                limits = y_limits_cmin,
+                labels = scales::comma_format()) +
+  my_theme
+
+# CSF Cmin
+Li_Cmin_CSF_CrCl <- ggplot(Li_CrCl_ss,
+                           aes(x = Dosing,
+                               y = min_DVCSF,
+                               fill = CrCl)) +
+  geom_violin(position = position_dodge(width = 0.85),
+              alpha = 0.3, color = "black", linewidth = 1.5) +
+  geom_boxplot(width = 0.2,
+               position = position_dodge(width = 0.85),
+               alpha = 0.7,
+               outlier.shape = NA,
+               color = "black", linewidth = 1.2) +
+  labs(
+    title = "Li model – CSF Cmin according to dosing regimen and CrCl",
+    x = "Dosing regimen",
+    y = "CSF Cmin 72–96 h (mg/L)"
+  ) +
+  scale_fill_jco(name = "CrCl") +
+  scale_y_log10(breaks = custom_breaks_cmin,
+                limits = y_limits_cmin,
+                labels = scales::comma_format()) +
+  my_theme
+
+Li_Cmin_plot <- ggpubr::ggarrange(
+  Li_Cmin_Plasma_CrCl,
+  Li_Cmin_CSF_CrCl,
+  ncol = 1, nrow = 2,
+  labels = c("A", "B"),
+  common.legend = TRUE,
+  legend = "top"
+)
+
+png(file.path(out_dir, "Li_Cmin_CrCl_Plot.png"),
+    width = 20, height = 12, units = "in", res = 900)
+print(Li_Cmin_plot)
+dev.off()
+
+
+
+
+
+## ------------------------------------------------
+## PK profiles in plasma – Li model by CrCl
+## ------------------------------------------------
+
+Li_profile_plasma <- Li_CrCl_sim %>%
+  dplyr::group_by(Dosing, CrCl, time) %>%
+  dplyr::summarise(
+    median_DVf = median(DVf, na.rm = TRUE),
+    lower_IQR  = quantile(DVf, 0.25, na.rm = TRUE),
+    upper_IQR  = quantile(DVf, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+Li_PK_Plasma <- Li_profile_plasma %>%
+  ggplot(aes(x = time,
+             y = median_DVf,
+             colour = CrCl)) +
+  geom_line(linewidth = 1.2) +
+  ggh4x::facet_wrap2(~ Dosing, scales = "free_x", axes = "all") +
+  scale_colour_jco(name = "CrCl") +
+  xlab("Time (hours)") +
+  ylab("Free linezolid in plasma (mg/L)") +
+  ggtitle("Li model – LZD PK profile in plasma by CrCl") +
+  my_theme
+
+png(file.path(out_dir, "Li_PK_Plasma_CrCl.png"),
+    width = 20, height = 10, units = "in", res = 900)
+print(Li_PK_Plasma)
+dev.off()
+
+
+
+
+
+## ------------------------------------------------
+## PK profiles in CSF – Li model by CrCl
+## ------------------------------------------------
+
+Li_profile_csf <- Li_CrCl_sim %>%
+  dplyr::group_by(Dosing, CrCl, time) %>%
+  dplyr::summarise(
+    median_DVCSF = median(DVCSF, na.rm = TRUE),
+    lower_IQR    = quantile(DVCSF, 0.25, na.rm = TRUE),
+    upper_IQR    = quantile(DVCSF, 0.75, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+Li_PK_CSF <- Li_profile_csf %>%
+  ggplot(aes(x = time,
+             y = median_DVCSF,
+             colour = CrCl)) +
+  geom_line(linewidth = 1.2) +
+  ggh4x::facet_wrap2(~ Dosing, scales = "free_x", axes = "all") +
+  scale_colour_jco(name = "CrCl") +
+  xlab("Time (hours)") +
+  ylab("Linezolid in CSF (mg/L)") +
+  ggtitle("Li model – LZD PK profile in CSF by CrCl") +
+  my_theme
+
+png(file.path(out_dir, "Li_PK_CSF_CrCl.png"),
+    width = 20, height = 10, units = "in", res = 900)
+print(Li_PK_CSF)
+dev.off()
+
+
+
+
+
+
+
+
+
+
+
+
+# Ensure Dosing order is the usual one
+tox_summary <- tox_summary %>%
+  mutate(
+    Dosing = factor(
+      Dosing,
+      levels = c("600q12h", "600q8h", "600q6h",
+                 "1200q24hCI", "1800q24hCI", "2400q24hCI")
+    ),
+    Model = factor(Model, levels = c("Luque", "DF", "Li"))
+  )
+
+# Top panel: Cmin toxicity
+p_tox_cmin <- ggplot(tox_summary,
+                     aes(x = Dosing, y = Tox_Cmin_pct, fill = Dosing)) +
+  geom_col(width = 0.75, color = "black") +
+  geom_text(aes(label = sprintf("%.1f%%", Tox_Cmin_pct)),
+            vjust = -0.4, size = 3.3) +
+  ggh4x::facet_wrap2(~ Model, axes = "all") +
+  scale_fill_jco(guide = "none") +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) +
+  labs(
+    title = "Probability of toxicity – Cmin (plasma) > 4.83 mg/L",
+    x = "Dosing regimen",
+    y = "Probability (%)"
+  ) +
+  theme_bw(base_size = 12)
+
+# Bottom panel: fAUC toxicity
+p_tox_auc <- ggplot(tox_summary,
+                    aes(x = Dosing, y = Tox_AUC_pct, fill = Dosing)) +
+  geom_col(width = 0.75, color = "black") +
+  geom_text(aes(label = sprintf("%.1f%%", Tox_AUC_pct)),
+            vjust = -0.4, size = 3.3) +
+  ggh4x::facet_wrap2(~ Model, axes = "all") +
+  scale_fill_jco(guide = "none") +
+  scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) +
+  labs(
+    title = "Probability of toxicity – fAUC (72–96 h, plasma)",
+    subtitle = "Model-specific thresholds: Luque 200 | DF 250 | Li 181 mg·h/L",
+    x = "Dosing regimen",
+    y = "Probability (%)"
+  ) +
+  theme_bw(base_size = 12)
+
+# Arrange top & bottom into a single figure
+tox_plot <- ggpubr::ggarrange(
+  p_tox_cmin, p_tox_auc,
+  ncol = 1, nrow = 2,
+  labels = c("A", "B")
+)
+
+png(file.path(out_dir, "Toxicity_Probability_Models.png"),
+    width = 20, height = 14, units = "in", res = 900)
+print(tox_plot)
+dev.off()
+
+
+
+
+# Violin/box for Cmin with a red threshold line
+p_cmin_raw <- SS_all %>%
+  ggplot(aes(x = Dosing, y = min_DVf, fill = Dosing)) +
+  geom_violin(alpha = 0.3, color = "black", linewidth = 1) +
+  geom_boxplot(width = 0.2, alpha = 0.7, outlier.shape = NA) +
+  geom_hline(yintercept = tox_cmin_thresh, linetype = 2, linewidth = 1) +
+  ggh4x::facet_wrap2(~ Model, axes = "all") +
+  scale_fill_jco(guide = "none") +
+  scale_y_log10() +
+  labs(title = "Cmin (72–96 h, plasma) with toxicity threshold",
+       y = "Unbound Cmin (mg/L)", x = "Dosing regimen") +
+  theme_bw(base_size = 12)
+
+# Violin/box for fAUC with model-specific red line per facet
+p_auc_raw <- SS_all %>%
+  mutate(th_line = case_when(
+    Model == "Luque" ~ tox_auc_thresh["Luque"],
+    Model == "DF"    ~ tox_auc_thresh["DF"],
+    Model == "Li"    ~ tox_auc_thresh["Li"]
+  )) %>%
+  ggplot(aes(x = Dosing, y = AUCP_72_96, fill = Dosing)) +
+  geom_violin(alpha = 0.3, color = "black", linewidth = 1) +
+  geom_boxplot(width = 0.2, alpha = 0.7, outlier.shape = NA) +
+  ggh4x::facet_wrap2(~ Model, axes = "all") +
+  scale_fill_jco(guide = "none") +
+  scale_y_continuous(trans = "log10") +
+  labs(title = "fAUC (72–96 h, plasma) with model-specific toxicity thresholds",
+       y = "fAUC 72–96 h (mg·h/L)", x = "Dosing regimen") +
+  theme_bw(base_size = 12) +
+  # Add threshold per facet
+  geom_hline(data = distinct(SS_all, Model) %>%
+               mutate(th_line = tox_auc_thresh[Model]),
+             aes(yintercept = th_line),
+             linetype = 2, linewidth = 1, inherit.aes = FALSE)
+
+png(file.path(out_dir, "Toxicity_Distributions_Models.png"),
+    width = 20, height = 14, units = "in", res = 900)
+print(ggpubr::ggarrange(p_cmin_raw, p_auc_raw, ncol = 1, nrow = 2, labels = c("A","B")))
+dev.off()
 
 
