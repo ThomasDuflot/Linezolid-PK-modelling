@@ -59,7 +59,7 @@ AUCCSF : AUC in CSF (mg/L.h)
 $TABLE
 double DV  = (CENTRAL / VC) ;
 double DVCSF = (CSF / VCSF);
-double DVf = DV*0.69;
+double DVf = DV;
 
 
 $MAIN
@@ -210,7 +210,7 @@ AUCCSF : AUC in CSF (mg/L.h)
 $TABLE
 double DV  = (CENTRAL / VC) ;
 double DVCSF = (CSF / VCSF);
-double DVf = DV*0.69;
+double DVf = DV;
 
 $MAIN
 double CL = TVCL *exp(ETA(1))* pow((CrCl/98.53),(CrCl_CL*exp(ETA(7))))   ;
@@ -372,7 +372,7 @@ AUCCSF : AUC in CSF (mg/L.h)
 $TABLE
 double DV  = (CENTRAL / VC) ;
 double DVCSF = (CSF / VCSF);
-double DVf = 0.69*DV;
+double DVf = DV;
 
 $MAIN
 double CL = TVCL *exp(ETA(1))   ;
@@ -979,9 +979,9 @@ Plasma_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCP_72_96, fill = Model)) 
   geom_boxplot(width = 0.2, position = position_dodge(width = 0.85), alpha = 0.7, 
                outlier.shape = NA, color = "black", linewidth = 1.2) +  
   labs(
-    title = "Plasma fAUC according to Dosing Regimen and Model",
+    title = "Plasma AUC according to Dosing Regimen and Model",
     x = "Dosing Regimen",
-    y = "fAUC at steady state (mg/L.h)"
+    y = "AUC at steady state (mg/L.h)"
   ) +
   scale_fill_jco() +  
   scale_color_jco() +  
@@ -994,9 +994,9 @@ CSF_AUC <- ggplot(min_values, aes(x = Dosing, y = AUCCSF_72_96, fill = Model)) +
   geom_boxplot(width = 0.2, position = position_dodge(width = 0.85), alpha = 0.7, 
                outlier.shape = NA, color = "black", linewidth = 1.2) +  
   labs(
-    title = "CSF fAUC according to Dosing Regimen and Model",
+    title = "CSF AUC according to Dosing Regimen and Model",
     x = "Dosing Regimen",
-    y = "fAUC at steady state (mg/L.h)"
+    y = "AUC at steady state (mg/L.h)"
   ) +
   scale_fill_jco() +  
   scale_color_jco() +  
@@ -1013,7 +1013,7 @@ combined_plot_AUC <- ggarrange(
 )
 
 # Save combined plot
-png("C:/Users/thomas.duflot/Desktop/LZD/AUC_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/AUC_Plot.png", width = 20, height = 12, units = 'in', res = 900)  
 print(combined_plot_AUC)
 dev.off()
 
@@ -1069,7 +1069,7 @@ combined_plot_Cmin <- ggarrange(
 
 
 # Save combined plot
-png("C:/Users/thomas.duflot/Desktop/LZD/Cmin_Plotv2.png", width = 20, height = 12, units = 'in', res = 900)  
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/Cmin_Plotv2.png", width = 20, height = 12, units = 'in', res = 900)  
 print(combined_plot_Cmin)
 dev.off()
 
@@ -1226,6 +1226,11 @@ SimDosing_Plasma_Luque,
 # Save or print as needed
 print(combined_plot_Sim_Plasma)
 
+# Save combined plot
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/Combined_plot_Sim_Plasma.png", width = 20, height = 12, units = 'in', res = 900)  
+print(combined_plot_Sim_Plasma)
+dev.off()
+
 
 
 
@@ -1301,7 +1306,11 @@ SimDosing_CSF_Luque,
 )
 
 # Display or save the plot
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/Combined_plot_Sim_CSF.png", width = 20, height = 12, units = 'in', res = 900)  
 print(combined_plot_Sim_CSF)
+dev.off()
+
+
 
 
 
@@ -1326,7 +1335,7 @@ combined_plot_Sim <- ggarrange(
 
 print(combined_plot_Sim)
 
-png("C:/Users/thomas.duflot/Desktop/LZD/Sim_Plot.png", width = 24, height = 12, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/Sim_Plot.png", width = 24, height = 12, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_Sim)
@@ -1445,7 +1454,7 @@ PTA_AUC_Plasma <- ggplot(combined_PTA_AUC_results  %>% filter(Model == "Li"), ae
   facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) ") +
-  ggtitle("PTA (fAUC/MIC > 100 for plasma LZD concentration)") + 
+  ggtitle("PTA (AUC/MIC > 100 for plasma LZD concentration)") + 
   my_theme + 
   theme(
     strip.background = element_blank(),   # Clean up facet strip background
@@ -1467,7 +1476,7 @@ PTA_AUC_CSF <- ggplot(combined_PTA_AUC_results %>% filter(Model == "Li"), aes(x 
   facet_wrap(~ Dosing, scales = "free_x") +  # Facet by reordered dosing regimen with free x-axis scaling
   xlab("MIC (mg/L)") + 
   ylab("PTA (%) and MIC Distribution (%)") +
-  ggtitle("PTA (fAUC/MIC > 100 for CSF LZD concentration)") + 
+  ggtitle("PTA (AUC/MIC > 100 for CSF LZD concentration)") + 
   my_theme + 
   theme(
     strip.background = element_blank(),   # Clean up facet strip background
@@ -1486,7 +1495,7 @@ combined_plot_PTA <- ggarrange(PTA_AUC_Plasma, PTA_AUC_CSF,
 
 
 
-png("C:/Users/thomas.duflot/Desktop/LZD/PTA_AUC_Plot_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/PTA_AUC_Plot_MIC.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 
 # Print the plot to the device
 print(combined_plot_PTA)
@@ -1530,7 +1539,7 @@ PTA_fT_Plasma <- ggplot(combined_results_fT %>% filter(Model == "Li"),
   facet_wrap(~ Dosing, scales = "free_x") +
   xlab("MIC (mg/L)") +
   ylab("PTA (%)") +
-  ggtitle("PTA (fT > MIC 85% pour LZD plasmatique)") +
+  ggtitle("PTA (%T > MIC 85% pour LZD plasmatique)") +
   my_theme +
   theme(
     strip.background  = element_blank(),
@@ -1558,7 +1567,7 @@ PTA_fT_CSF <- ggplot(combined_results_fT %>% filter(Model == "Li"),
   facet_wrap(~ Dosing, scales = "free_x") +
   xlab("MIC (mg/L)") +
   ylab("PTA (%)") +
-  ggtitle("PTA (fT > MIC 85% pour LZD en LCR)") +
+  ggtitle("PTA (%T > MIC 85% pour LZD en LCR)") +
   my_theme +
   theme(
     strip.background  = element_blank(),
@@ -1576,7 +1585,7 @@ combined_plot_PTA_fT <- ggarrange(
 )
 
 
-png("C:/Users/thomas.duflot/Desktop/LZD/PTA_fT_MIC.png", 
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/PTA_%T_MIC.png", 
     width = 12, height = 16, units = 'in', res = 900)
 print(combined_plot_PTA_fT)
 dev.off()
@@ -1730,7 +1739,7 @@ print(MIC_Distrib)
 
 
 
-png("C:/Users/thomas.duflot/Desktop/LZD/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/MIC Distribution.png", width = 12, height = 16, units = 'in', res = 900)  # Specify width, height, and resolution
 print(MIC_Distrib)
 dev.off()
 
@@ -1762,10 +1771,10 @@ combined_PTA_AUC_results <- combined_PTA_AUC_results %>%
 ##---------------------------------------------------------------
 
 df_fT_plasma <- combined_results_fT %>%
-  transmute(Dosing, Model, MIC, Target = "fT > MIC", Value = as.numeric(PTA_DVf), Matrix = "Plasma")
+  transmute(Dosing, Model, MIC, Target = "%T > MIC", Value = as.numeric(PTA_DVf), Matrix = "Plasma")
 
 df_fT_csf <- combined_results_fT %>%
-  transmute(Dosing, Model, MIC, Target = "fT > MIC", Value = as.numeric(PTA_DVCSF), Matrix = "CSF")
+  transmute(Dosing, Model, MIC, Target = "%T > MIC", Value = as.numeric(PTA_DVCSF), Matrix = "CSF")
 
 df_AUC_plasma <- combined_PTA_AUC_results %>%
   transmute(Dosing, Model, MIC, Target = "AUC/MIC > 100", Value = as.numeric(PTA_AUCP), Matrix = "Plasma")
@@ -2018,10 +2027,10 @@ plot_CFR <- function(df, plot_title) {
 }
 
 # Generate individual plots
-plot_CFR_fT_Plasma <- plot_CFR(df_CFR_fT_Plasma, "CFR (fT > MIC 85% for Plasma)")
-plot_CFR_fT_CSF <- plot_CFR(df_CFR_fT_CSF, "CFR (fT > MIC 85% for CSF)")
-plot_CFR_AUC_Plasma <- plot_CFR(df_CFR_AUC_Plasma, "CFR (fAUC/MIC > 100 for Plasma)")
-plot_CFR_AUC_CSF <- plot_CFR(df_CFR_AUC_CSF, "CFR (fAUC/MIC > 100 for CSF)")
+plot_CFR_fT_Plasma <- plot_CFR(df_CFR_fT_Plasma, "CFR (%T > MIC 85% for Plasma)")
+plot_CFR_fT_CSF <- plot_CFR(df_CFR_fT_CSF, "CFR (%T > MIC 85% for CSF)")
+plot_CFR_AUC_Plasma <- plot_CFR(df_CFR_AUC_Plasma, "CFR (AUC/MIC > 100 for Plasma)")
+plot_CFR_AUC_CSF <- plot_CFR(df_CFR_AUC_CSF, "CFR (AUC/MIC > 100 for CSF)")
 
 # Arrange all plots into one figure using ggarrange()
 combined_CFR_plot <- ggarrange(
@@ -2036,7 +2045,7 @@ combined_CFR_plot <- ggarrange(
 print(combined_CFR_plot)
 
 # Save as PNG
-png("C:/Users/thomas.duflot/Desktop/LZD/CFR_Combined_Plot.png", width = 16, height = 12, units = "in", res = 300)
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/CFR_Combined_Plot.png", width = 16, height = 12, units = "in", res = 300)
 print(combined_CFR_plot)
 dev.off()
 
@@ -2194,9 +2203,9 @@ DF_AUC_Plasma_wt <- ggplot(DF_wt_ss,
                outlier.shape = NA,
                color = "black", linewidth = 1.2) +
   labs(
-    title = "DF model – Plasma fAUC according to dosing regimen and weight",
+    title = "DF model – Plasma AUC according to dosing regimen and weight",
     x = "Dosing regimen",
-    y = "Plasma fAUC 72–96 h (mg·h/L)"
+    y = "Plasma AUC 72–96 h (mg·h/L)"
   ) +
   scale_fill_jco(name = "Weight") +
   scale_y_log10(breaks = custom_breaks_auc,
@@ -2237,7 +2246,7 @@ DF_AUC_plot <- ggarrange(
 )
 
 # Adapt the path to your system
-png("C:/Users/thomas.duflot/Desktop/LZD/DF_AUC_Weight_Plot.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_AUC_Weight_Plot.png",
     width = 20, height = 12, units = "in", res = 900)
 print(DF_AUC_plot)
 dev.off()
@@ -2306,7 +2315,7 @@ DF_Cmin_plot <- ggarrange(
   legend = "top"
 )
 
-png("C:/Users/thomas.duflot/Desktop/LZD/DF_Cmin_Weight_Plot.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_Cmin_Weight_Plot.png",
     width = 20, height = 12, units = "in", res = 900)
 print(DF_Cmin_plot)
 dev.off()
@@ -2337,13 +2346,13 @@ DF_PK_Plasma <- DF_profile_plasma %>%
   facet_wrap(~ Dosing, scales = "free_x") +
   scale_colour_jco(name = "Weight") +
   xlab("Time (hours)") +
-  ylab("Free linezolid in plasma (mg/L)") +
+  ylab("Linezolid in plasma (mg/L)") +
   ggtitle("DF model – LZD PK profile in plasma by weight") +
   my_theme +
   theme(panel.spacing.x = unit(2, "lines"),
         panel.spacing.y = unit(1, "lines"))
 
-png("C:/Users/thomas.duflot/Desktop/LZD/DF_PK_Plasma_Weight.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_PK_Plasma_Weight.png",
     width = 20, height = 10, units = "in", res = 900)
 print(DF_PK_Plasma)
 dev.off()
@@ -2379,7 +2388,7 @@ DF_PK_CSF <- DF_profile_csf %>%
   theme(panel.spacing.x = unit(2, "lines"),
         panel.spacing.y = unit(1, "lines"))
 
-png("C:/Users/thomas.duflot/Desktop/LZD/DF_PK_CSF_Weight.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_PK_CSF_Weight.png",
     width = 20, height = 10, units = "in", res = 900)
 print(DF_PK_CSF)
 dev.off()
@@ -2467,11 +2476,11 @@ DF_PTA_fT_plasma_plot <- DF_PTA_fT_weight %>%
   scale_colour_jco(name = "Weight") +
   ylim(0, 100) +
   xlab("MIC (mg/L)") +
-  ylab("PTA (%) – fT>MIC (Plasma)") +
-  ggtitle("DF model – PTA fT>MIC in plasma by weight and dosing regimen") +
+  ylab("PTA (%) – %T>MIC (Plasma)") +
+  ggtitle("DF model – PTA %T>MIC in plasma by weight and dosing regimen") +
   my_theme
 
-png("C:/Users/thomas.duflot/Desktop/LZD/DF_PTA_fT_Plasma_Weight.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_PTA_fT_Plasma_Weight.png",
     width = 20, height = 10, units = "in", res = 900)
 print(DF_PTA_fT_plasma_plot)
 dev.off()
@@ -2493,11 +2502,11 @@ DF_PTA_fT_csf_plot <- DF_PTA_fT_weight %>%
   scale_colour_jco(name = "Weight") +
   ylim(0, 100) +
   xlab("MIC (mg/L)") +
-  ylab("PTA (%) – fT>MIC (CSF)") +
-  ggtitle("DF model – PTA fT>MIC in CSF by weight and dosing regimen") +
+  ylab("PTA (%) – %T>MIC (CSF)") +
+  ggtitle("DF model – PTA %T>MIC in CSF by weight and dosing regimen") +
   my_theme
 
-png("C:/Users/thomas.duflot/Desktop/LZD/DF_PTA_fT_CSF_Weight.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_PTA_%T_CSF_Weight.png",
     width = 20, height = 10, units = "in", res = 900)
 print(DF_PTA_fT_csf_plot)
 dev.off()
@@ -2521,7 +2530,7 @@ DF_PTA_AUC_plasma_plot <- DF_PTA_AUC_weight %>%
   ggtitle("DF model – PTA AUC/MIC in plasma by weight and dosing regimen") +
   my_theme
 
-png("C:/Users/thomas.duflot/Desktop/LZD/DF_PTA_AUC_Plasma_Weight.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_PTA_AUC_Plasma_Weight.png",
     width = 20, height = 10, units = "in", res = 900)
 print(DF_PTA_AUC_plasma_plot)
 dev.off()
@@ -2545,7 +2554,7 @@ DF_PTA_AUC_csf_plot <- DF_PTA_AUC_weight %>%
   ggtitle("DF model – PTA AUC/MIC in CSF by weight and dosing regimen") +
   my_theme
 
-png("C:/Users/thomas.duflot/Desktop/LZD/DF_PTA_AUC_CSF_Weight.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_PTA_AUC_CSF_Weight.png",
     width = 20, height = 10, units = "in", res = 900)
 print(DF_PTA_AUC_csf_plot)
 dev.off()
@@ -2573,8 +2582,8 @@ DF_PTA_weight_table <- DF_PTA_fT_weight %>%
 # Optional: rename for nicer column titles
 DF_PTA_weight_table <- DF_PTA_weight_table %>%
   rename(
-    `PTA fT>MIC Plasma (%)`            = PTA_fT_DVf,
-    `PTA fT>MIC CSF (%)`               = PTA_fT_DVCSF,
+    `PTA %T>MIC Plasma (%)`            = PTA_fT_DVf,
+    `PTA %T>MIC CSF (%)`               = PTA_fT_DVCSF,
     `PTA AUC/MIC≥100 Plasma (%)`       = PTA_AUC_DVf,
     `PTA AUC/MIC≥100 CSF (%)`          = PTA_AUC_DVCSF
   )
@@ -2589,8 +2598,8 @@ ft_DF_PTA_weight <- DF_PTA_weight_table %>%
     WT  = "Weight",
     Dosing = "Dosing regimen",
     MIC = "MIC (mg/L)",
-    `PTA fT>MIC Plasma (%)`      = "Plasma",
-    `PTA fT>MIC CSF (%)`         = "CSF",
+    `PTA %T>MIC Plasma (%)`      = "Plasma",
+    `PTA %T>MIC CSF (%)`         = "CSF",
     `PTA AUC/MIC≥100 Plasma (%)` = "Plasma",
     `PTA AUC/MIC≥100 CSF (%)`    = "CSF"
   ) %>%
@@ -2598,7 +2607,7 @@ ft_DF_PTA_weight <- DF_PTA_weight_table %>%
   add_header_row(
     values = c(
       "Weight", "Dosing regimen", "MIC (mg/L)",
-      "PTA fT>MIC (≥85% of time 72–96 h)",
+      "PTA %T>MIC (≥85% of time 72–96 h)",
       paste0("PTA AUC/MIC ≥ ", target_AUC_MIC, " (72–96 h)")
     ),
     colwidths = c(1, 1, 1, 2, 2)
@@ -2628,7 +2637,7 @@ library(ggsci)
 ## ------------------------------------------------
 
 # Output folder (adapt if needed)
-out_dir <- "C:/Users/thomas.duflot/Desktop/LZD"
+out_dir <- "C:/Users/thomas.duflot/Desktop/LZD/R2/"
 
 # Creatinine clearance scenarios
 CrCl_vec <- c(45, 90, 120, 150, 200,250)
@@ -2770,11 +2779,11 @@ Li_PTA_fT_plasma_plot <- Li_PTA_fT_CrCl %>%
   scale_colour_jco(name = "CrCl") +
   ylim(0, 100) +
   xlab("MIC (mg/L)") +
-  ylab("PTA (%) – fT>MIC (Plasma)") +
-  ggtitle("Li model – PTA fT>MIC in plasma by CrCl and dosing regimen") +
+  ylab("PTA (%) – %T>MIC (Plasma)") +
+  ggtitle("Li model – PTA %T>MIC in plasma by CrCl and dosing regimen") +
   my_theme
 
-png(file.path(out_dir, "Li_PTA_fT_Plasma_CrCl.png"),
+png(file.path(out_dir, "Li_PTA_%T_Plasma_CrCl.png"),
     width = 20, height = 10, units = "in", res = 900)
 print(Li_PTA_fT_plasma_plot)
 dev.off()
@@ -2792,11 +2801,11 @@ Li_PTA_fT_csf_plot <- Li_PTA_fT_CrCl %>%
   scale_colour_jco(name = "CrCl") +
   ylim(0, 100) +
   xlab("MIC (mg/L)") +
-  ylab("PTA (%) – fT>MIC (CSF)") +
-  ggtitle("Li model – PTA fT>MIC in CSF by CrCl and dosing regimen") +
+  ylab("PTA (%) – %T>MIC (CSF)") +
+  ggtitle("Li model – PTA %T>MIC in CSF by CrCl and dosing regimen") +
   my_theme
 
-png(file.path(out_dir, "Li_PTA_fT_CSF_CrCl.png"),
+png(file.path(out_dir, "Li_PTA_%T_CSF_CrCl.png"),
     width = 20, height = 10, units = "in", res = 900)
 print(Li_PTA_fT_csf_plot)
 dev.off()
@@ -2893,9 +2902,9 @@ Li_AUC_Plasma_CrCl <- ggplot(Li_CrCl_ss,
                outlier.shape = NA,
                color = "black", linewidth = 1.2) +
   labs(
-    title = "Li model – Plasma fAUC according to dosing regimen and CrCl",
+    title = "Li model – Plasma AUC according to dosing regimen and CrCl",
     x = "Dosing regimen",
-    y = "Plasma fAUC 72–96 h (mg·h/L)"
+    y = "Plasma AUC 72–96 h (mg·h/L)"
   ) +
   scale_fill_jco(name = "CrCl") +
   scale_y_log10(breaks = custom_breaks_auc,
@@ -3109,13 +3118,13 @@ p_tox_cmin <- ggplot(tox_summary,
   scale_fill_jco(guide = "none") +
   scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) +
   labs(
-    title = "Probability of toxicity – Cmin (plasma) > 4.83 mg/L",
+    title = "Probability of toxicity – Cmin (plasma) > 7 mg/L",
     x = "Dosing regimen",
     y = "Probability (%)"
   ) +
   theme_bw(base_size = 12)
 
-# Bottom panel: fAUC toxicity
+# Bottom panel: AUC toxicity
 p_tox_auc <- ggplot(tox_summary,
                     aes(x = Dosing, y = Tox_AUC_pct, fill = Dosing)) +
   geom_col(width = 0.75, color = "black") +
@@ -3125,8 +3134,8 @@ p_tox_auc <- ggplot(tox_summary,
   scale_fill_jco(guide = "none") +
   scale_y_continuous(limits = c(0, 100), breaks = seq(0, 100, 20)) +
   labs(
-    title = "Probability of toxicity – fAUC (72–96 h, plasma)",
-    subtitle = "Model-specific thresholds: Luque 200 | DF 250 | Li 181 mg·h/L",
+    title = "Probability of toxicity – AUC (72–96 h, plasma)",
+    subtitle = "Threshold:300 mg·h/L",
     x = "Dosing regimen",
     y = "Probability (%)"
   ) +
@@ -3157,10 +3166,10 @@ p_cmin_raw <- SS_all %>%
   scale_fill_jco(guide = "none") +
   scale_y_log10() +
   labs(title = "Cmin (72–96 h, plasma) with toxicity threshold",
-       y = "Unbound Cmin (mg/L)", x = "Dosing regimen") +
+       y = "Cmin (mg/L)", x = "Dosing regimen") +
   theme_bw(base_size = 12)
 
-# Violin/box for fAUC with model-specific red line per facet
+# Violin/box for AUC with model-specific red line per facet
 p_auc_raw <- SS_all %>%
   mutate(th_line = case_when(
     Model == "Luque" ~ tox_auc_thresh["Luque"],
@@ -3173,8 +3182,8 @@ p_auc_raw <- SS_all %>%
   ggh4x::facet_wrap2(~ Model, axes = "all") +
   scale_fill_jco(guide = "none") +
   scale_y_continuous(trans = "log10") +
-  labs(title = "fAUC (72–96 h, plasma) with model-specific toxicity thresholds",
-       y = "fAUC 72–96 h (mg·h/L)", x = "Dosing regimen") +
+  labs(title = "AUC (72–96 h, plasma) with model-specific toxicity thresholds",
+       y = "AUC 72–96 h (mg·h/L)", x = "Dosing regimen") +
   theme_bw(base_size = 12) +
   # Add threshold per facet
   geom_hline(data = distinct(SS_all, Model) %>%
