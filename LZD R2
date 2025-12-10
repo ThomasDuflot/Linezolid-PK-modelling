@@ -1585,7 +1585,7 @@ combined_plot_PTA_fT <- ggarrange(
 )
 
 
-png("C:/Users/thomas.duflot/Desktop/LZD/R2/PTA_%T_MIC.png", 
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/PTA_PercT_MIC.png", 
     width = 12, height = 16, units = 'in', res = 900)
 print(combined_plot_PTA_fT)
 dev.off()
@@ -2506,7 +2506,7 @@ DF_PTA_fT_csf_plot <- DF_PTA_fT_weight %>%
   ggtitle("DF model – PTA %T>MIC in CSF by weight and dosing regimen") +
   my_theme
 
-png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_PTA_%T_CSF_Weight.png",
+png("C:/Users/thomas.duflot/Desktop/LZD/R2/DF_PTA_PercT_CSF_Weight.png",
     width = 20, height = 10, units = "in", res = 900)
 print(DF_PTA_fT_csf_plot)
 dev.off()
@@ -2783,7 +2783,7 @@ Li_PTA_fT_plasma_plot <- Li_PTA_fT_CrCl %>%
   ggtitle("Li model – PTA %T>MIC in plasma by CrCl and dosing regimen") +
   my_theme
 
-png(file.path(out_dir, "Li_PTA_%T_Plasma_CrCl.png"),
+png(file.path(out_dir, "Li_PTA_PercT_Plasma_CrCl.png"),
     width = 20, height = 10, units = "in", res = 900)
 print(Li_PTA_fT_plasma_plot)
 dev.off()
@@ -2805,7 +2805,7 @@ Li_PTA_fT_csf_plot <- Li_PTA_fT_CrCl %>%
   ggtitle("Li model – PTA %T>MIC in CSF by CrCl and dosing regimen") +
   my_theme
 
-png(file.path(out_dir, "Li_PTA_%T_CSF_CrCl.png"),
+png(file.path(out_dir, "Li_PTA_percT_CSF_CrCl.png"),
     width = 20, height = 10, units = "in", res = 900)
 print(Li_PTA_fT_csf_plot)
 dev.off()
