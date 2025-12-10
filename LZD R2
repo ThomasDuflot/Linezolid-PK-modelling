@@ -3093,6 +3093,120 @@ dev.off()
 
 
 
+tox_cmin_thresh <- 7
+tox_auc_thresh  <- c(Luque = 300, DF = 300, Li = 300)  # mg·h/L (72–96 h fAUC)
+
+## =========================================================
+## Resimulate the 3 models (Luque, DF, Li) over 0–96 h
+## and build steady-state 72–96 h metrics
+## =========================================================
+
+library(dplyr)
+library(mrgsolve)
+
+set.seed(1234)
+
+## ---------- 6 dosing regimens (common to all models) ----------
+events_6 <- list(
+  `600q12h`     = ev(amt = 600,  rate = 1200, cmt = 1, ii = 12, addl = 20),
+  `600q8h`      = ev(amt = 600,  rate = 1200, cmt = 1, ii =  8, addl = 20),
+  `600q6h`      = ev(amt = 600,  rate = 1200, cmt = 1, ii =  6, addl = 20),
+  `1200q24hCI`  = ev(amt = 4800, rate =   50, cmt = 1, ii =  0, addl =  0),
+  `1800q24hCI`  = ev(amt = 7200, rate =   75, cmt = 1, ii =  0, addl =  0),
+  `2400q24hCI`  = ev(amt = 9600, rate =  100, cmt = 1, ii =  0, addl =  0)
+)
+dosing_levels <- names(events_6)
+
+## ---------- helper: simulate one model over all regimens ----------
+sim_model <- function(mod, idata, model_name, end = 96, delta = 0.1) {
+  out_list <- vector("list", length(events_6))
+  names(out_list) <- names(events_6)
+  for (ev_name in names(events_6)) {
+    out <- mod %>%
+      ev(events_6[[ev_name]]) %>%
+      mrgsim(idata = idata, end = end, delta = delta, obsonly = TRUE)
+    out_list[[ev_name]] <- as.data.frame(out) %>%
+      left_join(idata, by = "ID", multiple = "first") %>%
+      mutate(Dosing = factor(ev_name, levels = dosing_levels),
+             Model  = model_name)
+  }
+  bind_rows(out_list)
+}
+
+## ---------- N per model ----------
+n_ind <- 1000
+
+## ---------- IDATA per model (reference covariates) ----------
+## DF: reference WT = 70 (as per your $PARAM)
+DF_idata <- tibble(ID = 1:n_ind, WT = 70)
+
+## Luque: no covariate (if your Luque model has any, add columns here)
+Luque_idata <- tibble(ID = 1:n_ind)
+
+## Li: reference renal function CrCl = 90, typical PCT = 0.14
+Li_idata <- tibble(ID = 1:n_ind, CrCl = 90, PCT = 0.14)
+
+## ---------- Simulate ----------
+## Ensure the model objects exist; edit the names if different on your side
+stopifnot(exists("DF_mod"), exists("Li_mod"), exists("Luque_mod"))
+
+DF_sim    <- sim_model(DF_mod,    DF_idata,    "DF")
+Luque_sim <- sim_model(Luque_mod, Luque_idata, "Luque")
+Li_sim    <- sim_model(Li_mod,    Li_idata,    "Li")
+
+## =========================================================
+## Steady-state (72–96 h) metrics: Cmin (plasma) + fAUC (plasma)
+## =========================================================
+## NOTE: assumes your models accumulate AUCP over time (as in your DF code)
+## and capture free plasma conc as DVf.
+
+mk_ss <- function(sim_df) {
+  sim_df %>%
+    filter(time >= 72, time <= 96) %>%
+    group_by(Dosing, ID) %>%
+    summarise(
+      min_DVf    = min(DVf,  na.rm = TRUE),
+      AUCP_72_96 = max(AUCP, na.rm = TRUE) - min(AUCP, na.rm = TRUE),
+      .groups = "drop"
+    )
+}
+
+DF_ss    <- mk_ss(DF_sim)
+Luque_ss <- mk_ss(Luque_sim)
+Li_ss    <- mk_ss(Li_sim)
+
+## Optional: check quick heads
+lapply(list(Luque_sim=Luque_sim, DF_sim=DF_sim, Li_sim=Li_sim), head)
+lapply(list(Luque_ss=Luque_ss, DF_ss=DF_ss, Li_ss=Li_ss), head)
+
+
+
+# Combine all models
+SS_all <- bind_rows(Luque_ss, DF_ss, Li_ss)
+
+# Map model-specific AUC thresholds to each row
+SS_all <- SS_all %>%
+  mutate(
+    tox_auc_cut = case_when(
+      Model == "Luque" ~ tox_auc_thresh["Luque"],
+      Model == "DF"    ~ tox_auc_thresh["DF"],
+      Model == "Li"    ~ tox_auc_thresh["Li"]
+    )
+  )
+
+# Probability of toxicity per Dosing × Model
+tox_summary <- SS_all %>%
+  group_by(Model, Dosing) %>%
+  summarise(
+    # % with free Cmin > 7 mg/L (plasma)
+    Tox_Cmin_pct = mean(min_DVf > tox_cmin_thresh, na.rm = TRUE) * 100,
+    # % with fAUC 72–96 h > model-specific threshold (plasma)
+    Tox_AUC_pct  = mean(AUCP_72_96 > tox_auc_cut, na.rm = TRUE) * 100,
+    n = n(),
+    .groups = "drop"
+  )
+
+
 
 
 
