@@ -1912,7 +1912,7 @@ make_flex <- function(data_wide, header_df) {
   numeric_cols <- names(data_wide)[-c(1,2)]  # Skip "Dosing" & "Target"
   for (col in numeric_cols) {
     ft <- colformat_num(ft, j = col, digits = 1)  # Standard rounding
-    ft <- compose(ft, j = col, value = as_paragraph(as_chunk(format_numbers(data_wide[[col]]))))
+    ft <- flextable::compose(ft, j = col, value = as_paragraph(as_chunk(format_numbers(data_wide[[col]]))))
   }
 
   return(ft)
@@ -3171,18 +3171,17 @@ mk_ss <- function(sim_df) {
     )
 }
 
-DF_ss    <- mk_ss(DF_sim)
-Luque_ss <- mk_ss(Luque_sim)
-Li_ss    <- mk_ss(Li_sim)
+DF_ss    <- mk_ss(DF_sim)    %>% dplyr::mutate(Model = "DF")
+Luque_ss <- mk_ss(Luque_sim) %>% dplyr::mutate(Model = "Luque")
+Li_ss    <- mk_ss(Li_sim)    %>% dplyr::mutate(Model = "Li")
+
+SS_all <- dplyr::bind_rows(Luque_ss, DF_ss, Li_ss)
+
 
 ## Optional: check quick heads
 lapply(list(Luque_sim=Luque_sim, DF_sim=DF_sim, Li_sim=Li_sim), head)
 lapply(list(Luque_ss=Luque_ss, DF_ss=DF_ss, Li_ss=Li_ss), head)
 
-
-
-# Combine all models
-SS_all <- bind_rows(Luque_ss, DF_ss, Li_ss)
 
 # Map model-specific AUC thresholds to each row
 SS_all <- SS_all %>%
