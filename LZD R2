@@ -1168,7 +1168,7 @@ summary_data_Plasma$Model <- factor(summary_data_Plasma$Model, levels = c("Li", 
 jco_colors <- pal_jco()(3)
 
 # Set custom Y-axis scale
-custom_y_scale <- scale_y_continuous(breaks = c(0, 5, 10, 15, 20), limits = c(0, 22))
+custom_y_scale <- scale_y_continuous(breaks = c(0, 5, 10, 15, 20,25,30,35), limits = c(0, 36))
 
 
 SimDosing_Plasma_Luque <- summary_data_Plasma %>%
